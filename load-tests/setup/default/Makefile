@@ -192,7 +192,7 @@ endif
 
 # Install/upgrade Camunda Platform helm chart
 .PHONY: install-platform
-install-platform: setup-leader-balancer
+install-platform: setup-leader-balancer setup-elasticsearch
 	helm upgrade $(namespace) $(helm_chart_platform) \
 		--install \
 		--namespace $(namespace) \
@@ -240,6 +240,11 @@ setup-leader-balancer:
 	else \
 		echo "Leader balancer cronjob already exists"; \
 	fi
+
+
+.PHONY: setup-elasticsearch
+setup-elasticsearch:
+	kubectl apply --server-side --namespace $(namespace) -f resources/elasticsearch.yaml
 
 # Generates templates from the Camunda Platform helm chart
 .PHONY: template
@@ -312,6 +317,8 @@ else ifeq ($(secondary_storage),opensearch)
 	@echo "Cleaning up OpenSearch cluster for namespace $(namespace)..."
 	-helm --namespace $(namespace) uninstall opensearch
 	-kubectl delete -n $(namespace) pvc -l app.kubernetes.io/name=opensearch
+else ifeq ($(secondary_storage),elasticsearch)
+	-kubectl delete -n $(namespace) -f elasticsearch.yaml
 endif
 	@echo "Deleting namespace $(namespace) and waiting for finalization..."
 	# `--wait` (default) blocks until the namespace is fully gone. We intentionally
