@@ -306,7 +306,9 @@ public enum ZbColumnFamilies implements EnumValue, ScopedColumnFamily {
   // partition to query. An entry is "cross-partition" iff this CF has a value for the lock; the
   // partition P_B = hash(businessId) is derived at query time, not stored. Local-PI lock entries
   // are absent from this CF and continue to be released by today's local completion path.
-  CROSS_PARTITION_MESSAGE_START_LOCK_BUSINESS_ID(147, PARTITION_LOCAL);
+  CROSS_PARTITION_MESSAGE_START_LOCK_BUSINESS_ID(147, PARTITION_LOCAL),
+
+  JOB_ACTIVATABLE_BY_PRIORITY(148, PARTITION_LOCAL);
 
   private final int value;
   private final ColumnFamilyScope columnFamilyScope;
