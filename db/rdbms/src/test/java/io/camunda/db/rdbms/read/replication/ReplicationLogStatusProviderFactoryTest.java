@@ -23,15 +23,31 @@ class ReplicationLogStatusProviderFactoryTest {
     // given
     final var vendorDatabaseProperties = mock(VendorDatabaseProperties.class);
     when(vendorDatabaseProperties.databaseId()).thenReturn("postgresql");
-    final var factory =
-        new ReplicationLogStatusProviderFactory(
-            vendorDatabaseProperties, mock(ReplicationStatusMapper.class));
+    final var mapper = mock(ReplicationStatusMapper.class);
+    when(mapper.isAurora()).thenReturn(false);
+    final var factory = new ReplicationLogStatusProviderFactory(vendorDatabaseProperties, mapper);
 
     // when
     final var provider = factory.create();
 
     // then
     assertThat(provider).isInstanceOf(PostgresReplicationLogStatusProvider.class);
+  }
+
+  @Test
+  void shouldCreateAuroraReplicationLogStatusProviderWhenAuroraDetected() {
+    // given
+    final var vendorDatabaseProperties = mock(VendorDatabaseProperties.class);
+    when(vendorDatabaseProperties.databaseId()).thenReturn("postgresql");
+    final var mapper = mock(ReplicationStatusMapper.class);
+    when(mapper.isAurora()).thenReturn(true);
+    final var factory = new ReplicationLogStatusProviderFactory(vendorDatabaseProperties, mapper);
+
+    // when
+    final var provider = factory.create();
+
+    // then
+    assertThat(provider).isInstanceOf(AuroraReplicationLogStatusProvider.class);
   }
 
   @Test

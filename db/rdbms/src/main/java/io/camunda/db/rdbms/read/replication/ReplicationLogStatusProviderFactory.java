@@ -26,8 +26,7 @@ public final class ReplicationLogStatusProviderFactory {
 
   public ReplicationLogStatusProvider create() {
     return switch (vendorDatabaseProperties.databaseId()) {
-      case POSTGRESQL_DATABASE_ID ->
-          new PostgresReplicationLogStatusProvider(replicationStatusMapper);
+      case POSTGRESQL_DATABASE_ID -> createPostgresOrAuroraProvider();
       case null ->
           throw new IllegalArgumentException(
               "Cannot create ReplicationLogStatusProvider for null database id");
@@ -36,5 +35,18 @@ public final class ReplicationLogStatusProviderFactory {
               "Cannot create ReplicationLogStatusProvider for unknown database id "
                   + vendorDatabaseProperties.databaseId());
     };
+  }
+
+  /**
+   * Aurora Global Database presents itself as PostgreSQL over JDBC. When the {@code
+   * aurora_global_db_instance_status} function is found in {@code pg_proc} we use the
+   * Aurora-specific provider that reads {@code durable_lsn}; otherwise we fall back to the standard
+   * PostgreSQL provider that reads {@code pg_stat_replication}.
+   */
+  private ReplicationLogStatusProvider createPostgresOrAuroraProvider() {
+    if (replicationStatusMapper.isAurora()) {
+      return new AuroraReplicationLogStatusProvider(replicationStatusMapper);
+    }
+    return new PostgresReplicationLogStatusProvider(replicationStatusMapper);
   }
 }
