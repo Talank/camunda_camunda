@@ -13,6 +13,7 @@ import io.camunda.db.rdbms.sql.ReplicationStatusMapper;
 public final class ReplicationLogStatusProviderFactory {
 
   public static final String POSTGRESQL_DATABASE_ID = "postgresql";
+  public static final String MYSQL_DATABASE_ID = "mysql";
 
   private final VendorDatabaseProperties vendorDatabaseProperties;
   private final ReplicationStatusMapper replicationStatusMapper;
@@ -27,6 +28,7 @@ public final class ReplicationLogStatusProviderFactory {
   public ReplicationLogStatusProvider create() {
     return switch (vendorDatabaseProperties.databaseId()) {
       case POSTGRESQL_DATABASE_ID -> createPostgresOrAuroraProvider();
+      case MYSQL_DATABASE_ID -> createMysqlAuroraProvider();
       case null ->
           throw new IllegalArgumentException(
               "Cannot create ReplicationLogStatusProvider for null database id");
@@ -48,5 +50,19 @@ public final class ReplicationLogStatusProviderFactory {
       return new AuroraReplicationLogStatusProvider(replicationStatusMapper);
     }
     return new PostgresReplicationLogStatusProvider(replicationStatusMapper);
+  }
+
+  /**
+   * Plain MySQL does not provide an LSN-based replication monitoring API. Only Aurora MySQL does
+   * (via {@code aurora_global_db_instance_status()}). If Aurora is not detected the configuration
+   * is invalid and an exception is thrown to prevent silent data-loss scenarios.
+   */
+  private ReplicationLogStatusProvider createMysqlAuroraProvider() {
+    if (replicationStatusMapper.isAurora()) {
+      return new AuroraReplicationLogStatusProvider(replicationStatusMapper);
+    }
+    throw new IllegalStateException(
+        "Replication monitoring requires AWS Aurora MySQL. "
+            + "Plain MySQL does not support the LSN-based replication monitoring API.");
   }
 }
