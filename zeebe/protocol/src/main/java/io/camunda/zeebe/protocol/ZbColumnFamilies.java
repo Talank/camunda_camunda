@@ -310,7 +310,7 @@ public enum ZbColumnFamilies implements EnumValue, ScopedColumnFamily {
   CROSS_PARTITION_MESSAGE_START_LOCK_BUSINESS_ID(147, PARTITION_LOCAL),
 
   JOB_ACTIVATABLE_BY_PRIORITY(148, PARTITION_LOCAL);
-  
+
   private final int value;
   private final ColumnFamilyScope columnFamilyScope;
 
