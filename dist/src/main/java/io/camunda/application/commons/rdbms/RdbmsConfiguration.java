@@ -7,6 +7,7 @@
  */
 package io.camunda.application.commons.rdbms;
 
+import io.camunda.application.commons.search.PhysicalTenantSearchClientReaders;
 import io.camunda.configuration.Camunda;
 import io.camunda.configuration.SecondaryStorage.SecondaryStorageType;
 import io.camunda.configuration.conditions.ConditionalOnSecondaryStorageType;
@@ -25,15 +26,11 @@ import io.camunda.db.rdbms.write.RdbmsMapperBundle;
 import io.camunda.db.rdbms.write.RdbmsWriterFactory;
 import io.camunda.db.rdbms.write.queue.TransactionRunner;
 import io.camunda.db.rdbms.write.service.PersistentWebSessionWriter;
-import io.camunda.search.clients.CamundaSearchClients;
-import io.camunda.search.clients.auth.ResourceAccessDelegatingController;
 import io.camunda.search.clients.reader.SearchClientReaders;
-import io.camunda.security.reader.ResourceAccessController;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
@@ -132,21 +129,12 @@ public class RdbmsConfiguration {
   }
 
   @Bean
-  public Map<String, SearchClientReaders> physicalTenantSearchClientReaders(
+  public PhysicalTenantSearchClientReaders physicalTenantSearchClientReaders(
       final Map<String, RdbmsTenantReaders> rdbmsTenantReaders) {
     final var byTenant = new LinkedHashMap<String, SearchClientReaders>();
     rdbmsTenantReaders.forEach(
         (tenantId, readers) -> byTenant.put(tenantId, readers.toSearchClientReaders()));
-    return Map.copyOf(byTenant);
-  }
-
-  @Bean
-  public CamundaSearchClients camundaSearchClients(
-      final Map<String, SearchClientReaders> physicalTenantSearchClientReaders,
-      final List<ResourceAccessController> resourceAccessControllers) {
-    return new CamundaSearchClients(
-        physicalTenantSearchClientReaders,
-        new ResourceAccessDelegatingController(resourceAccessControllers));
+    return new PhysicalTenantSearchClientReaders(Map.copyOf(byTenant));
   }
 
   @Bean
