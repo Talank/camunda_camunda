@@ -26,6 +26,7 @@ import io.camunda.db.rdbms.write.RdbmsMapperBundle;
 import io.camunda.db.rdbms.write.RdbmsWriterFactory;
 import io.camunda.db.rdbms.write.queue.TransactionRunner;
 import io.camunda.db.rdbms.write.service.PersistentWebSessionWriter;
+import io.camunda.search.clients.reader.AuthorizationReader;
 import io.camunda.search.clients.reader.SearchClientReaders;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Connection;
@@ -138,17 +139,18 @@ public class RdbmsConfiguration {
   }
 
   @Bean
+  public AuthorizationReader authorizationReader(
+      final Map<String, RdbmsTenantReaders> rdbmsTenantReaders) {
+    return defaultReaders(rdbmsTenantReaders).authorizationReader();
+  }
+
+  @Bean
   public RdbmsService rdbmsService(
       final RdbmsWriterFactory rdbmsWriterFactory,
       final Map<String, RdbmsTenantReaders> rdbmsTenantReaders,
       final HistoryDeletionDbReader historyDeletionDbReader,
       final ReplicationLogStatusProviderFactory replicationLogStatusProviderFactory) {
-    final var defaults = rdbmsTenantReaders.get(DEFAULT_PHYSICAL_TENANT_ID);
-    if (defaults == null) {
-      throw new IllegalStateException(
-          "Missing default physical tenant '%s' in rdbmsTenantReaders; known tenants: %s"
-              .formatted(DEFAULT_PHYSICAL_TENANT_ID, rdbmsTenantReaders.keySet()));
-    }
+    final var defaults = defaultReaders(rdbmsTenantReaders);
     return new RdbmsService(
         rdbmsWriterFactory,
         defaults.agentInstanceReader(),
@@ -208,5 +210,16 @@ public class RdbmsConfiguration {
   HealthContributor rdbmsStatusHealthIndicator(final DataSource dataSource) {
     // Equivalent to what Boot would normally wire for "db"
     return new DataSourceHealthIndicator(dataSource);
+  }
+
+  private static RdbmsTenantReaders defaultReaders(
+      final Map<String, RdbmsTenantReaders> rdbmsTenantReaders) {
+    final var defaults = rdbmsTenantReaders.get(DEFAULT_PHYSICAL_TENANT_ID);
+    if (defaults == null) {
+      throw new IllegalStateException(
+          "Missing default physical tenant '%s' in rdbmsTenantReaders; known tenants: %s"
+              .formatted(DEFAULT_PHYSICAL_TENANT_ID, rdbmsTenantReaders.keySet()));
+    }
+    return defaults;
   }
 }
