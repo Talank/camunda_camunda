@@ -16,6 +16,7 @@ import io.atomix.cluster.messaging.MessagingConfig;
 import io.atomix.cluster.messaging.MessagingException;
 import io.atomix.cluster.messaging.impl.NettyMessagingService;
 import io.atomix.utils.net.Address;
+import io.camunda.zeebe.protocol.Protocol;
 import io.camunda.zeebe.scheduler.testing.ActorSchedulerRule;
 import io.camunda.zeebe.test.util.socket.SocketUtil;
 import io.camunda.zeebe.transport.ClientRequest;
@@ -47,6 +48,7 @@ import java.util.function.Supplier;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.SnowflakeIdGenerator;
+import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -76,6 +78,7 @@ public class AtomixTransportTest {
   private static TransportFactory transportFactory;
   private static NettyMessagingService nettyMessagingService;
   @AutoClose private static MeterRegistry meterRegistry = new SimpleMeterRegistry();
+  private static final String MESSAGE_CONTENT = "messageABC";
 
   @Parameter(0)
   public String testName;
@@ -86,8 +89,12 @@ public class AtomixTransportTest {
   @Parameter(2)
   public Function<AtomixCluster, ServerTransport> serverTransportFunction;
 
+  @Parameter(3)
+  public String topicPrefix;
+
   private ClientTransport clientTransport;
   private ServerTransport serverTransport;
+  private Request request;
 
   @Parameters(name = "{0}")
   public static Collection<Object[]> data() {
@@ -95,7 +102,7 @@ public class AtomixTransportTest {
     return Arrays.asList(
         new Object[][] {
           {
-            "use same messaging service",
+            "use same messaging service (default topic)",
             (Function<AtomixCluster, ClientTransport>)
                 (cluster) -> {
                   final var messagingService = cluster.getMessagingService();
@@ -106,25 +113,28 @@ public class AtomixTransportTest {
                   final var messagingService = cluster.getMessagingService();
                   return transportFactory.createServerTransport(
                       messagingService, requestIdGenerator, TOPIC_SUPPLIERS);
-                }
+                },
+            "default"
           },
           {
-            "use default-{topic}-prefixed topics in client requests",
+            "use same messaging service (non-default topic)",
             (Function<AtomixCluster, ClientTransport>)
                 (cluster) -> {
                   final var messagingService = cluster.getMessagingService();
-                  return transportFactory.createClientTransport(
-                      messagingService, TopicSupplier.withPrefix(TOPIC_PREFIX));
+                  return transportFactory.createClientTransport(messagingService);
                 },
             (Function<AtomixCluster, ServerTransport>)
                 (cluster) -> {
                   final var messagingService = cluster.getMessagingService();
                   return transportFactory.createServerTransport(
-                      messagingService, requestIdGenerator, TOPIC_SUPPLIERS);
-                }
+                      messagingService,
+                      requestIdGenerator,
+                      List.of(TopicSupplier.withPrefix("tenant1")));
+                },
+            "tenant1"
           },
           {
-            "use different messaging service",
+            "use different messaging service (default topic)",
             (Function<AtomixCluster, ClientTransport>)
                 (cluster) -> {
                   final var messagingService = cluster.getMessagingService();
@@ -135,22 +145,25 @@ public class AtomixTransportTest {
                   createNettyMessagingServiceIfNull();
                   return transportFactory.createServerTransport(
                       nettyMessagingService, requestIdGenerator, TOPIC_SUPPLIERS);
-                }
+                },
+            "default"
           },
           {
-            "use different messaging service and prefixed client requests",
+            "use different messaging service (non-default topic)",
             (Function<AtomixCluster, ClientTransport>)
                 (cluster) -> {
                   final var messagingService = cluster.getMessagingService();
-                  return transportFactory.createClientTransport(
-                      messagingService, TopicSupplier.withPrefix(TOPIC_PREFIX));
+                  return transportFactory.createClientTransport(messagingService);
                 },
             (Function<AtomixCluster, ServerTransport>)
                 (cluster) -> {
                   createNettyMessagingServiceIfNull();
                   return transportFactory.createServerTransport(
-                      nettyMessagingService, requestIdGenerator, TOPIC_SUPPLIERS);
-                }
+                      nettyMessagingService,
+                      requestIdGenerator,
+                      List.of(TopicSupplier.withPrefix("tenant1")));
+                },
+            "tenant1"
           }
         });
   }
@@ -188,6 +201,7 @@ public class AtomixTransportTest {
   public void beforeTest() {
     clientTransport = clientTransportFunction.apply(cluster);
     serverTransport = serverTransportFunction.apply(cluster);
+    request = new Request(MESSAGE_CONTENT).withPartitionGroup(topicPrefix);
   }
 
   @After
@@ -216,13 +230,12 @@ public class AtomixTransportTest {
 
     // when
     final var requestFuture =
-        clientTransport.sendRequestWithRetry(
-            nodeAddressSupplier, new Request("messageABC"), REQUEST_TIMEOUT);
+        clientTransport.sendRequestWithRetry(nodeAddressSupplier, request, REQUEST_TIMEOUT);
 
     // then
     final var response = requestFuture.join();
-    assertThat(response.byteArray()).isEqualTo("messageABC".getBytes());
-    assertThat(incomingRequestFuture.join()).isEqualTo("messageABC".getBytes());
+    assertThat(response.byteArray()).isEqualTo(MESSAGE_CONTENT.getBytes());
+    assertThat(incomingRequestFuture.join()).isEqualTo(MESSAGE_CONTENT.getBytes());
   }
 
   @Test
@@ -235,7 +248,7 @@ public class AtomixTransportTest {
 
     // when
     clientTransport.sendRequestWithRetry(
-        nodeAddressSupplier, (response) -> false, new Request("messageABC"), REQUEST_TIMEOUT);
+        nodeAddressSupplier, (response) -> false, request, REQUEST_TIMEOUT);
 
     // then
     final var success = retryLatch.await(REQUEST_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
@@ -258,8 +271,7 @@ public class AtomixTransportTest {
 
     // when
     final var requestFuture =
-        clientTransport.sendRequestWithRetry(
-            nodeAddressSupplier, new Request("messageABC"), REQUEST_TIMEOUT);
+        clientTransport.sendRequestWithRetry(nodeAddressSupplier, request, REQUEST_TIMEOUT);
 
     // then
     assertThatThrownBy(requestFuture::join)
@@ -280,7 +292,7 @@ public class AtomixTransportTest {
 
     final var requestFuture =
         clientTransport.sendRequestWithRetry(
-            nodeAddressSupplier, new Request("messageABC"), REQUEST_TIMEOUT_NO_SUCCESS);
+            nodeAddressSupplier, request, REQUEST_TIMEOUT_NO_SUCCESS);
 
     // then
     assertThatThrownBy(requestFuture::join).hasCauseInstanceOf(TimeoutException.class);
@@ -294,7 +306,7 @@ public class AtomixTransportTest {
     // when
     final var requestFuture =
         clientTransport.sendRequestWithRetry(
-            () -> "0.0.0.0:26499", new Request("messageABC"), REQUEST_TIMEOUT_NO_SUCCESS);
+            () -> "0.0.0.0:26499", request, REQUEST_TIMEOUT_NO_SUCCESS);
 
     // then
     assertThatThrownBy(requestFuture::join).hasCauseInstanceOf(TimeoutException.class);
@@ -305,8 +317,7 @@ public class AtomixTransportTest {
     // given
 
     // when
-    final var requestFuture =
-        clientTransport.sendRequest(() -> null, new Request("messageABC"), REQUEST_TIMEOUT);
+    final var requestFuture = clientTransport.sendRequest(() -> null, request, REQUEST_TIMEOUT);
 
     // then
     assertThatThrownBy(requestFuture::join)
@@ -327,7 +338,7 @@ public class AtomixTransportTest {
               retryLatch.countDown();
               return nodeAddressRef.get();
             },
-            new Request("messageABC"),
+            request,
             REQUEST_TIMEOUT);
 
     // when
@@ -352,7 +363,7 @@ public class AtomixTransportTest {
         clientTransport.sendRequestWithRetry(
             nodeAddressSupplier,
             (responseToValidate) -> responseValidation.get(),
-            new Request("messageABC"),
+            request,
             REQUEST_TIMEOUT);
 
     // when
@@ -361,7 +372,7 @@ public class AtomixTransportTest {
 
     // then
     final var response = requestFuture.join();
-    assertThat(response.byteArray()).isEqualTo("messageABC".getBytes());
+    assertThat(response.byteArray()).isEqualTo(MESSAGE_CONTENT.getBytes());
   }
 
   @Test
@@ -371,7 +382,7 @@ public class AtomixTransportTest {
     // when
     final var requestFuture =
         clientTransport.sendRequestWithRetry(
-            () -> "0.0.0.0:26499", new Request("messageABC"), REQUEST_TIMEOUT_NO_SUCCESS);
+            () -> "0.0.0.0:26499", request, REQUEST_TIMEOUT_NO_SUCCESS);
 
     // then
     assertThatThrownBy(requestFuture::join).hasCauseInstanceOf(TimeoutException.class);
@@ -387,7 +398,7 @@ public class AtomixTransportTest {
               retryLatch.countDown();
               return serverAddress;
             },
-            new Request("messageABC"),
+            request,
             REQUEST_TIMEOUT);
 
     // when
@@ -396,7 +407,7 @@ public class AtomixTransportTest {
 
     // then
     final var response = requestFuture.join();
-    assertThat(response.byteArray()).isEqualTo("messageABC".getBytes());
+    assertThat(response.byteArray()).isEqualTo(MESSAGE_CONTENT.getBytes());
   }
 
   @Test
@@ -407,12 +418,11 @@ public class AtomixTransportTest {
 
     // when
     final var requestFuture =
-        clientTransport.sendRequest(
-            () -> serverAddress, new Request("messageABC"), REQUEST_TIMEOUT);
+        clientTransport.sendRequest(() -> serverAddress, request, REQUEST_TIMEOUT);
 
     // then
     final var response = requestFuture.join();
-    assertThat(response.byteArray()).isEqualTo("messageABC".getBytes());
+    assertThat(response.byteArray()).isEqualTo(MESSAGE_CONTENT.getBytes());
   }
 
   @Test
@@ -423,14 +433,12 @@ public class AtomixTransportTest {
 
     // when
     final var requestFuture1 =
-        clientTransport.sendRequestWithRetry(
-            nodeAddressSupplier, new Request("messageABC"), REQUEST_TIMEOUT);
+        clientTransport.sendRequestWithRetry(nodeAddressSupplier, request, REQUEST_TIMEOUT);
     requestFuture1.join();
     final long requestId1 = directlyResponder.serverResponse.getRequestId();
 
     final var requestFuture2 =
-        clientTransport.sendRequestWithRetry(
-            nodeAddressSupplier, new Request("messageABC"), REQUEST_TIMEOUT);
+        clientTransport.sendRequestWithRetry(nodeAddressSupplier, request, REQUEST_TIMEOUT);
     requestFuture2.join();
     final long requestId2 = directlyResponder.serverResponse.getRequestId();
 
@@ -441,9 +449,15 @@ public class AtomixTransportTest {
   private static final class Request implements ClientRequest {
 
     private final String msg;
+    private String partitionGroup = Protocol.DEFAULT_PARTITION_GROUP_NAME;
 
     public Request(final String msg) {
       this.msg = msg;
+    }
+
+    public Request withPartitionGroup(final String partitionGroup) {
+      this.partitionGroup = partitionGroup;
+      return this;
     }
 
     @Override
@@ -454,6 +468,11 @@ public class AtomixTransportTest {
     @Override
     public RequestType getRequestType() {
       return RequestType.COMMAND;
+    }
+
+    @Override
+    public @NotNull String getPartitionGroup() {
+      return partitionGroup;
     }
 
     @Override
