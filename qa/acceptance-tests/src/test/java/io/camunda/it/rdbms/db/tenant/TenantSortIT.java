@@ -7,7 +7,6 @@
  */
 package io.camunda.it.rdbms.db.tenant;
 
-import static io.camunda.it.rdbms.db.fixtures.CommonFixtures.nextKey;
 import static io.camunda.it.rdbms.db.fixtures.CommonFixtures.nextStringId;
 import static io.camunda.it.rdbms.db.fixtures.TenantFixtures.createAndSaveRandomTenants;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -78,14 +77,14 @@ public class TenantSortIT {
 
   @TestTemplate
   public void shouldSortByNameAsc(final CamundaRdbmsTestApplication testApplication) {
-    final var aggregator = nextKey(); // Will be used to have isolated test data
+    final var aggregator = nextStringId(); // Will be used to have isolated test data
 
     testSorting(
         testApplication.getRdbmsService(),
         b -> b.name().asc(),
         Comparator.comparing(TenantEntity::name),
-        b -> b.tenantKey(aggregator),
-        b -> b.key(aggregator));
+        b -> b.tenantId(aggregator),
+        b -> b.tenantId(aggregator));
   }
 
   private void testSorting(
