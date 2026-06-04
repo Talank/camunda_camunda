@@ -77,14 +77,12 @@ public class TenantSortIT {
 
   @TestTemplate
   public void shouldSortByNameAsc(final CamundaRdbmsTestApplication testApplication) {
-    final var aggregator = nextStringId(); // Will be used to have isolated test data
-
     testSorting(
         testApplication.getRdbmsService(),
         b -> b.name().asc(),
         Comparator.comparing(TenantEntity::name),
-        b -> b.tenantId(aggregator),
-        b -> b.tenantId(aggregator));
+        b -> b,
+        b -> b);
   }
 
   private void testSorting(
