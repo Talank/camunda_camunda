@@ -271,5 +271,10 @@ public class BackupServiceImplTest {
       onSuccess.run();
       backups.put(id, backup);
     }
+
+    @Override
+    public void validateAliasIntegrity() {
+      // no alias integrity errors
+    }
   }
 }

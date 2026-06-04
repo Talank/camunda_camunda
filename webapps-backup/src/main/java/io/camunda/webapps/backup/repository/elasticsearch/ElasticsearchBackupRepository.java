@@ -15,7 +15,9 @@ import static java.util.stream.Collectors.toList;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
 import co.elastic.clients.elasticsearch._types.SortOrder;
+import co.elastic.clients.elasticsearch.indices.GetAliasResponse;
 import co.elastic.clients.elasticsearch.indices.GetIndexRequest;
+import co.elastic.clients.elasticsearch.indices.get_alias.IndexAliases;
 import co.elastic.clients.elasticsearch.snapshot.CreateSnapshotRequest;
 import co.elastic.clients.elasticsearch.snapshot.CreateSnapshotResponse;
 import co.elastic.clients.elasticsearch.snapshot.GetSnapshotRequest;
@@ -44,8 +46,11 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -168,6 +173,30 @@ public class ElasticsearchBackupRepository implements BackupRepository {
               backupId);
       throw new BackupRepositoryConnectionException(reason, e);
     }
+  }
+
+  @Override
+  public void validateAliasIntegrity() {
+    final GetAliasResponse response;
+    try {
+      response = esClient.indices().getAlias();
+    } catch (IOException ex) {
+      throw new BackupRepositoryConnectionException(
+          "Exception occurren when retrieving the aliases from Elasticsearch", ex);
+    }
+
+    final Map<String, IndexAliases> aliases = response.result();
+
+    /* build the reverse map: alias -> { index1, ..., indexN } */
+    final Map<String, Set<String>> aliasToIndexes = new HashMap<>();
+    for (final Map.Entry<String, IndexAliases> entry : aliases.entrySet()) {
+      final String index = entry.getKey();
+      for (final String alias : entry.getValue().aliases().keySet()) {
+        aliasToIndexes.computeIfAbsent(alias, k -> new HashSet<>()).add(index);
+      }
+    }
+
+    validateAliasToIndexes(aliasToIndexes);
   }
 
   @Override

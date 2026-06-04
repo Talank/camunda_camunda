@@ -39,6 +39,8 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +54,9 @@ import org.opensearch.client.json.JsonData;
 import org.opensearch.client.opensearch.OpenSearchAsyncClient;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch._types.OpenSearchException;
+import org.opensearch.client.opensearch.indices.GetAliasResponse;
 import org.opensearch.client.opensearch.indices.GetIndexRequest;
+import org.opensearch.client.opensearch.indices.get_alias.IndexAliases;
 import org.opensearch.client.opensearch.snapshot.GetSnapshotResponse;
 import org.opensearch.client.opensearch.snapshot.SnapshotInfo;
 import org.slf4j.Logger;
@@ -159,6 +163,30 @@ public class OpensearchBackupRepository implements BackupRepository {
               response.snapshots().stream().map(SnapshotInfo::uuid).collect(joining(", ")));
       throw new InvalidRequestException(reason);
     }
+  }
+
+  @Override
+  public void validateAliasIntegrity() {
+    final GetAliasResponse response;
+    try {
+      response = openSearchClient.indices().getAlias();
+    } catch (IOException ex) {
+      throw new BackupRepositoryConnectionException(
+          "Exception occurren when retrieving the aliases from OpenSearch", ex);
+    }
+
+    final Map<String, IndexAliases> aliases = response.result();
+
+    /* build the reverse map: alias -> { index1, ..., indexN } */
+    final Map<String, Set<String>> aliasToIndexes = new HashMap<>();
+    for (final Map.Entry<String, IndexAliases> entry : aliases.entrySet()) {
+      final String index = entry.getKey();
+      for (final String alias : entry.getValue().aliases().keySet()) {
+        aliasToIndexes.computeIfAbsent(alias, k -> new HashSet<>()).add(index);
+      }
+    }
+
+    validateAliasToIndexes(aliasToIndexes);
   }
 
   @Override

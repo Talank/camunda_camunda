@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 public class BackupServiceImpl implements BackupService {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BackupServiceImpl.class);
+  private static final String ANOTHER_BACKUP_RUNS_MSG = "Another backup is running at the moment";
   private final Executor threadPoolTaskExecutor;
   private final Queue<SnapshotRequest> requestsQueue = new ConcurrentLinkedQueue<>();
 
@@ -67,13 +68,17 @@ public class BackupServiceImpl implements BackupService {
   public TakeBackupResponseDto takeBackup(final TakeBackupRequestDto request) {
     repository.validateRepositoryExists(backupProps.repositoryName());
     repository.validateNoDuplicateBackupId(backupProps.repositoryName(), request.getBackupId());
+
+    // NOTE: The following check is non-locking on purpose to be quick.
     if (!requestsQueue.isEmpty()) {
-      throw new InvalidRequestException("Another backup is running at the moment");
-    } // TODO remove duplicate
+      throw new InvalidRequestException(ANOTHER_BACKUP_RUNS_MSG);
+    }
+
     synchronized (requestsQueue) {
       if (!requestsQueue.isEmpty()) {
-        throw new InvalidRequestException("Another backup is running at the moment");
+        throw new InvalidRequestException(ANOTHER_BACKUP_RUNS_MSG);
       }
+      repository.validateAliasIntegrity();
       return scheduleSnapshots(request);
     }
   }

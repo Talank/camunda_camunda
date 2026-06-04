@@ -26,6 +26,8 @@ public interface DocumentClient extends AutoCloseable {
 
   void createRepository(String repositoryName) throws IOException;
 
+  void createAlias(String indexName, String aliasName) throws IOException;
+
   static DocumentClient create(
       final String url, final DatabaseType databaseType, final Executor executor)
       throws IOException {

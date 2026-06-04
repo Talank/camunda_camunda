@@ -10,7 +10,9 @@ package io.camunda.webapps.backup;
 import io.camunda.webapps.backup.BackupService.SnapshotRequest;
 import io.camunda.webapps.backup.repository.SnapshotNameProvider;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -43,6 +45,8 @@ public interface BackupRepository {
 
   void executeSnapshotting(SnapshotRequest snapshotRequest, Runnable onSuccess, Runnable onFailure);
 
+  void validateAliasIntegrity();
+
   default boolean isIncompleteCheckTimedOut(
       final long incompleteCheckTimeoutInSeconds, final long lastSnapshotFinishedTime) {
     final var incompleteCheckTimeoutInMilliseconds = incompleteCheckTimeoutInSeconds * 1000;
@@ -65,5 +69,27 @@ public interface BackupRepository {
     } else {
       throw new IllegalArgumentException("Invalid pattern: " + pattern);
     }
+  }
+
+  default void validateAliasToIndexes(final Map<String, Set<String>> aliasToIndexes) {
+    final Set<String> errors = new HashSet<>();
+
+    for (final Map.Entry<String, Set<String>> entry : aliasToIndexes.entrySet()) {
+      final String alias = entry.getKey();
+      final Set<String> indexes = entry.getValue();
+      if (indexes.size() > 1) {
+        errors.add(
+            String.format(
+                "Alias '%s' points to more than 1 index: [%s]", alias, String.join(", ", indexes)));
+      }
+    }
+
+    if (errors.isEmpty()) {
+      return;
+    }
+
+    throw new BackupException(
+        "Alias integrity check failed. Please fix the following issues and try again:\n"
+            + String.join("\n", errors));
   }
 }
