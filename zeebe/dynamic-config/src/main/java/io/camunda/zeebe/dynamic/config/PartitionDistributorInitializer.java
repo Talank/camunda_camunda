@@ -48,13 +48,7 @@ public class PartitionDistributorInitializer implements ClusterConfigurationModi
       case final RoundRobinPartitionDistributor ignored ->
           new PartitionDistributorConfig.RoundRobinConfig();
       case final ZoneAwarePartitionDistributor zoneAware ->
-          new PartitionDistributorConfig.ZoneAwareConfig(
-              zoneAware.zoneSpecs().stream()
-                  .map(
-                      z ->
-                          new PartitionDistributorConfig.ZoneSpec(
-                              z.name(), z.numberOfReplicas(), z.priority()))
-                  .toList());
+          new PartitionDistributorConfig.ZoneAwareConfig(zoneAware.zoneSpecs());
       default -> {
         LOG.warn(
             "Unknown PartitionDistributor type '{}'; storing as FixedConfig",
