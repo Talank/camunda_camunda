@@ -35,6 +35,10 @@ const DocumentPreviewModal: React.FC<StateProps & DocumentPreviewProps> = ({
 };
 
 const ModalContent: React.FC<DocumentPreviewProps> = ({document}) => {
+  if (document.link === null) {
+    return <p>Preview not available for document "{document.fileName}".</p>;
+  }
+
   if (document.type === 'image') {
     return <PreviewImage src={document.link} alt={document.fileName} />;
   }
@@ -44,7 +48,7 @@ const ModalContent: React.FC<DocumentPreviewProps> = ({document}) => {
   }
 
   if (document.type === 'json') {
-    return <PreviewJson document={document} />;
+    return <PreviewJson src={document.link} fileName={document.fileName} />;
   }
 
   return <p>Preview not available for document "{document.fileName}".</p>;
