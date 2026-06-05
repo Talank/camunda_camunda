@@ -31,6 +31,9 @@ import io.camunda.zeebe.dynamic.config.metrics.TopologyManagerMetrics;
 import io.camunda.zeebe.dynamic.config.metrics.TopologyMetrics;
 import io.camunda.zeebe.dynamic.config.serializer.ProtoBufSerializer;
 import io.camunda.zeebe.dynamic.config.state.ClusterConfiguration;
+import io.camunda.zeebe.dynamic.config.state.PartitionDistributorConfig;
+import io.camunda.zeebe.dynamic.config.util.RoundRobinPartitionDistributor;
+import io.camunda.zeebe.dynamic.config.util.ZoneAwarePartitionDistributor;
 import io.camunda.zeebe.scheduler.Actor;
 import io.camunda.zeebe.scheduler.ActorSchedulingService;
 import io.camunda.zeebe.scheduler.AsyncClosable;
@@ -64,7 +67,7 @@ public final class ClusterConfigurationManagerService
   private final ClusterChangeExecutor clusterChangeExecutor;
   private final TopologyMetrics topologyMetrics;
   private final TopologyManagerMetrics topologyManagerMetrics;
-  private @Nullable volatile PartitionDistributor partitionDistributor;
+  private @Nullable StaticConfiguration staticConfiguration;
 
   public ClusterConfigurationManagerService(
       final Path dataRootDirectory,
@@ -111,7 +114,7 @@ public final class ClusterConfigurationManagerService
             new ProtoBufSerializer(),
             new ClusterConfigurationManagementRequestsHandler(
                 configurationChangeCoordinator,
-                () -> Objects.requireNonNull(partitionDistributor, "partitionDistributor is null"),
+                this::resolveDistributor,
                 localMemberId,
                 managerActor));
 
@@ -150,7 +153,8 @@ public final class ClusterConfigurationManagerService
                 staticConfiguration.localMemberId(),
                 managerActor,
                 false))
-        .andThen(new RoutingStateInitializer(staticConfiguration.partitionCount()));
+        .andThen(new RoutingStateInitializer(staticConfiguration.partitionCount()))
+        .andThen(new PartitionDistributorInitializer(staticConfiguration));
     // This initializer does not set the cluster ID, as it is not required for non-coordinators.
     // Non-coordinators will receive the cluster ID from the coordinator via gossip.
   }
@@ -177,6 +181,7 @@ public final class ClusterConfigurationManagerService
                 managerActor,
                 true))
         .andThen(new RoutingStateInitializer(staticConfiguration.partitionCount()))
+        .andThen(new PartitionDistributorInitializer(staticConfiguration))
         .andThen(new ClusterIdInitializer(staticConfiguration.clusterId()));
   }
 
@@ -184,8 +189,7 @@ public final class ClusterConfigurationManagerService
   public ActorFuture<Void> start(
       final ActorSchedulingService actorSchedulingService,
       final StaticConfiguration staticConfiguration) {
-    // TODO this needs to change once the partition distribution config is in ClusterConfiguration
-    partitionDistributor = staticConfiguration.partitionDistributor();
+    this.staticConfiguration = staticConfiguration;
     return startGossiper(actorSchedulingService)
         .andThen(
             () -> startClusterTopologyServices(actorSchedulingService, staticConfiguration),
@@ -276,5 +280,29 @@ public final class ClusterConfigurationManagerService
   @Override
   public void removeUpdateListener(final ClusterConfigurationUpdateListener listener) {
     clusterConfigurationGossiper.removeUpdateListener(listener);
+  }
+
+  private PartitionDistributor resolveDistributor() {
+    // Reads from the persisted (actor-thread-safe) configuration directly to avoid async
+    // indirection. Called from the manager actor when handling a request.
+    final var config = persistedClusterConfiguration.getConfiguration().partitionDistributorConfig();
+    if (config.isEmpty()) {
+      return new RoundRobinPartitionDistributor();
+    }
+    return switch (config.get()) {
+      case final PartitionDistributorConfig.RoundRobinConfig ignored ->
+          new RoundRobinPartitionDistributor();
+      case final PartitionDistributorConfig.ZoneAwareConfig zoneAware ->
+          new ZoneAwarePartitionDistributor(
+              zoneAware.zones().stream()
+                  .map(
+                      z ->
+                          new ZoneAwarePartitionDistributor.ZoneSpec(
+                              z.name(), z.numberOfReplicas(), z.priority()))
+                  .toList());
+      case final PartitionDistributorConfig.FixedConfig ignored ->
+          Objects.requireNonNull(staticConfiguration, "staticConfiguration not set")
+              .partitionDistributor();
+    };
   }
 }
