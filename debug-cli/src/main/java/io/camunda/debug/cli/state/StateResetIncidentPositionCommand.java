@@ -84,7 +84,7 @@ public class StateResetIncidentPositionCommand implements Callable<Integer> {
       names = {"--position"},
       description =
           "New lastIncidentUpdatePosition value. Defaults to -1 (reprocess all incidents from the "
-              + "start). Must not exceed the exporter's exportedPosition.",
+              + "start).",
       defaultValue = DEFAULT_RESET_POSITION)
   private long newPosition;
 
@@ -102,6 +102,7 @@ public class StateResetIncidentPositionCommand implements Callable<Integer> {
     final var err = spec.commandLine().getErr();
 
     out.println("=== Starting exporter incident-position reset ===");
+    validationError = null;
 
     if (verbose) {
       if (partitionId != null) {
@@ -121,47 +122,50 @@ public class StateResetIncidentPositionCommand implements Callable<Integer> {
     if (verbose) {
       err.println("\nOpening snapshot from: " + snapshotPath);
     }
-    final ZeebeDb db = snapshotUtil.openSnapshot(snapshotPath, runtimePath);
-    final var context = db.createContext();
+    // try-with-resources so the RocksDB instance (and its file locks on --runtime) is always
+    // released, including on the validation-error return path.
+    try (final ZeebeDb db = snapshotUtil.openSnapshot(snapshotPath, runtimePath)) {
+      final var context = db.createContext();
 
-    final DbString exporterKey = new DbString();
-    final ColumnFamily<DbString, ExporterStateEntry> exporterColumnFamily =
-        db.createColumnFamily(
-            ZbColumnFamilies.EXPORTER, context, exporterKey, new ExporterStateEntry());
+      final DbString exporterKey = new DbString();
+      final ColumnFamily<DbString, ExporterStateEntry> exporterColumnFamily =
+          db.createColumnFamily(
+              ZbColumnFamilies.EXPORTER, context, exporterKey, new ExporterStateEntry());
 
-    if (verbose) {
-      err.println("\nExecuting exporter metadata update transaction...");
+      if (verbose) {
+        err.println("\nExecuting exporter metadata update transaction...");
+      }
+      context.runInTransaction(
+          () ->
+              context
+                  .getCurrentTransaction()
+                  .run(() -> resetIncidentPosition(exporterColumnFamily, exporterKey)));
+
+      if (validationError != null) {
+        err.println("Error: " + validationError);
+        return 1;
+      }
+      context.getCurrentTransaction().commit();
+
+      final var lastFollowupEventPosition = SnapshotUtil.getLastFollowupEventPosition(snapshotPath);
+      if (verbose) {
+        err.println("\nTaking new snapshot...");
+      }
+      final var persistedSnapshot =
+          snapshotUtil.takeSnapshot(db, root, snapshotId, lastFollowupEventPosition);
+
+      out.println("\n=== Exporter incident-position reset completed successfully ===");
+      out.println("Created new snapshot at: " + persistedSnapshot.getPath());
+      out.println("\nNext steps:");
+      out.println("1. Delete the previous snapshot: " + snapshotId);
+      out.println("2. Restart this broker so it recovers from the patched snapshot");
+      out.println(
+          "3. Repeat on every replica of this partition: run against each broker's own latest "
+              + "snapshot. Do NOT copy the partition data folder across brokers - it also holds the "
+              + "per-replica raft journal and metadata.");
+
+      return 0;
     }
-    context.runInTransaction(
-        () ->
-            context
-                .getCurrentTransaction()
-                .run(() -> resetIncidentPosition(exporterColumnFamily, exporterKey)));
-
-    if (validationError != null) {
-      err.println("Error: " + validationError);
-      return 1;
-    }
-    context.getCurrentTransaction().commit();
-
-    final var lastFollowupEventPosition = SnapshotUtil.getLastFollowupEventPosition(snapshotPath);
-    if (verbose) {
-      err.println("\nTaking new snapshot...");
-    }
-    final var persistedSnapshot =
-        snapshotUtil.takeSnapshot(db, root, snapshotId, lastFollowupEventPosition);
-
-    out.println("\n=== Exporter incident-position reset completed successfully ===");
-    out.println("Created new snapshot at: " + persistedSnapshot.getPath());
-    out.println("\nNext steps:");
-    out.println("1. Delete the previous snapshot: " + snapshotId);
-    out.println("2. Restart this broker so it recovers from the patched snapshot");
-    out.println(
-        "3. Repeat on every replica of this partition: run against each broker's own latest "
-            + "snapshot. Do NOT copy the partition data folder across brokers - it also holds the "
-            + "per-replica raft journal and metadata.");
-
-    return 0;
   }
 
   private void resetIncidentPosition(
@@ -180,15 +184,6 @@ public class StateResetIncidentPositionCommand implements Callable<Integer> {
     }
 
     final long exporterPosition = entry.getPosition();
-    if (newPosition > exporterPosition) {
-      validationError =
-          String.format(
-              "Refusing to set lastIncidentUpdatePosition (%d) above the exporter's exportedPosition "
-                  + "(%d); the incident cursor must not point beyond what has already been exported. "
-                  + "Use -1 to reprocess all incidents from the start.",
-              newPosition, exporterPosition);
-      return;
-    }
 
     final ObjectNode metadataNode;
     try {
@@ -203,7 +198,7 @@ public class StateResetIncidentPositionCommand implements Callable<Integer> {
             ? metadataNode.get(LAST_INCIDENT_UPDATE_POSITION).asLong()
             : UNSET_POSITION;
 
-    out.println("  Exporter exportedPosition (preserved): " + exporterPosition);
+    out.println("  Exporter exporterPosition (preserved): " + exporterPosition);
     out.println("  Current lastIncidentUpdatePosition: " + currentIncidentPosition);
     out.println("  New lastIncidentUpdatePosition: " + newPosition);
 

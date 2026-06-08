@@ -114,28 +114,6 @@ class StateResetIncidentPositionCommandTest {
   }
 
   @Test
-  void shouldRejectPositionAboveExporterPosition() {
-    // given
-    final Path partitionRoot = tempDir.resolve("partitionRoot");
-    final var initialSnapshot = takeInitialSnapshot(partitionRoot);
-
-    // when
-    final int exitCode =
-        commandLine.execute(
-            "reset-incident-position",
-            "-r",
-            partitionRoot.toString(),
-            "--exporter-id=" + EXPORTER_ID,
-            "--position=" + (EXPORTER_POSITION + 1),
-            "--snapshot=" + initialSnapshot.getId().toString(),
-            "--runtime=" + tempDir.resolve("runtime"));
-
-    // then - command fails and leaves no new snapshot behind
-    assertThat(exitCode).isOne();
-    assertThat(listSnapshots(partitionRoot)).containsExactly(initialSnapshot.getId().toString());
-  }
-
-  @Test
   void shouldFailWhenExporterMissing() {
     // given
     final Path partitionRoot = tempDir.resolve("partitionRoot");
@@ -159,15 +137,12 @@ class StateResetIncidentPositionCommandTest {
   private PersistedSnapshot takeInitialSnapshot(final Path partitionRoot) {
     final var initialRuntime = newDbFactory().createDb(tempDir.resolve("initialRuntime").toFile());
 
+    final var context = initialRuntime.createContext();
     final DbString exporterKey = new DbString();
     final ColumnFamily<DbString, ExporterStateEntry> exporterColumnFamily =
         initialRuntime.createColumnFamily(
-            ZbColumnFamilies.EXPORTER,
-            initialRuntime.createContext(),
-            exporterKey,
-            new ExporterStateEntry());
+            ZbColumnFamilies.EXPORTER, context, exporterKey, new ExporterStateEntry());
 
-    final var context = initialRuntime.createContext();
     context.runInTransaction(
         () -> {
           final var entry = new ExporterStateEntry();

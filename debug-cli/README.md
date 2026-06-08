@@ -91,14 +91,14 @@ alias debug-cli="java -jar target/cdbg-${version}.jar"
   - `-s`, `--snapshot`: Id of the source snapshot directory.
   - `-e`, `--exporter-id`: Id of the exporter whose cursor should be reset.
   - `--position`: New `lastIncidentUpdatePosition`. Defaults to `-1` (reprocess all incidents from
-    the start). Rejected if it exceeds the exporter's `exportedPosition`.
+    the start).
   - `--partition-id`: Partition id, used only for logging.
   - `-v`, `--verbose`: Enable verbose output.
 - **Example:**
 
   ```
   debug-cli state reset-incident-position -r /path/to/partition-1 \
-    --snapshot 12-34-... --exporter-id camundaExporter --runtime /tmp/runtime
+    --snapshot 12-34-... --exporter-id camundaexporter --runtime /tmp/runtime
   ```
 - **Note:** The `EXPORTER` column family is partition-local and replicated, so run this against
   **every replica** of the partition, each on its own latest snapshot. Do **not** copy the partition
