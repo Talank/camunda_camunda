@@ -7,14 +7,17 @@
  */
 
 import {type Page} from '@playwright/test';
+import {Notifications} from './Notifications';
 
 class Header {
 	private page: Page;
 	private brandingName: string | undefined;
+	readonly notifications: Notifications;
 
 	constructor(page: Page, brandingName?: string) {
 		this.page = page;
 		this.brandingName = brandingName;
+		this.notifications = new Notifications(page);
 	}
 
 	get branding() {
