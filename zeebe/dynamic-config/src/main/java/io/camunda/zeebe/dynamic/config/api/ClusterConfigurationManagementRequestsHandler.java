@@ -120,7 +120,10 @@ public final class ClusterConfigurationManagementRequestsHandler
     return handleRequest(
         scaleRequest.dryRun(),
         new ScaleRequestTransformer(
-            partitionDistributor, scaleRequest.members(), scaleRequest.newReplicationFactor()));
+            partitionDistributor,
+            scaleRequest.members(),
+            scaleRequest.newReplicationFactor(),
+            scaleRequest.newPartitionCount()));
   }
 
   @Override

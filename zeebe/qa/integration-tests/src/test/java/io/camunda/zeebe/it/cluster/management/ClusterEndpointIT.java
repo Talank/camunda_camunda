@@ -68,6 +68,36 @@ abstract class ClusterEndpointIT {
     return MemberId.from(java.lang.String.valueOf(nodeIdx));
   }
 
+  protected void verifyClusterScaleViaPatch(
+      final ClusterActuator actuator, final ClusterConfigPatchRequest request) {
+    final var response = actuator.patchCluster(request, true, false);
+    assertThat(response.getExpectedTopology())
+        .describedAs("ClusterSize is " + brokerCount())
+        .hasSize(brokerCount());
+    assertThat(response.getExpectedTopology().getFirst().getPartitions().size())
+        .describedAs("Partitions are evenly distributed")
+        .isEqualTo(response.getExpectedTopology().getLast().getPartitions().size());
+    assertThat(response.getPlannedChanges()).isNotEmpty();
+  }
+
+  protected void verifyClusterPatch(
+      final ClusterActuator actuator, final ClusterConfigPatchRequest request) {
+    final var response = actuator.patchCluster(request, true, false);
+    assertThat(response.getExpectedTopology())
+        .describedAs("Cluster has " + brokerCount() + " brokers")
+        .hasSize(brokerCount());
+    assertThat(response.getExpectedTopology().getFirst().getPartitions().size())
+        .describedAs("Partitions are evenly distributed")
+        .isEqualTo(response.getExpectedTopology().getLast().getPartitions().size());
+    assertThat(response.getPlannedChanges()).isNotEmpty();
+  }
+
+  protected void verifyForceRemoveBroker(
+      final ClusterActuator actuator, final ClusterConfigPatchRequest request) {
+    final var response = actuator.patchCluster(request, false, true);
+    assertThat(response.getExpectedTopology()).hasSize(brokerCount() - 1);
+  }
+
   protected List<BrokerId> brokerIds(final int... nodeIdxs) {
     return IntStream.of(nodeIdxs).mapToObj(this::brokerId).toList();
   }
@@ -329,30 +359,6 @@ abstract class ClusterEndpointIT {
     }
   }
 
-  protected void assertClusterScaleResponse(
-      final ClusterActuator actuator, final ClusterConfigPatchRequest request) {
-    final var response = actuator.patchCluster(request, true, false);
-    assertThat(response.getExpectedTopology())
-        .describedAs("ClusterSize is " + brokerCount())
-        .hasSize(brokerCount());
-    assertThat(response.getExpectedTopology().getFirst().getPartitions().size())
-        .describedAs("Partitions are evenly distributed")
-        .isEqualTo(response.getExpectedTopology().getLast().getPartitions().size());
-    assertThat(response.getPlannedChanges()).isNotEmpty();
-  }
-
-  protected void assertClusterPatchResponse(
-      final ClusterActuator actuator, final ClusterConfigPatchRequest request) {
-    final var response = actuator.patchCluster(request, true, false);
-    assertThat(response.getExpectedTopology())
-        .describedAs("Cluster has " + brokerCount() + " brokers")
-        .hasSize(brokerCount());
-    assertThat(response.getExpectedTopology().getFirst().getPartitions().size())
-        .describedAs("Partitions are evenly distributed")
-        .isEqualTo(response.getExpectedTopology().getLast().getPartitions().size());
-    assertThat(response.getPlannedChanges()).isNotEmpty();
-  }
-
   @Nested
   final class ClusterPatchRequest {
     @Test
@@ -370,8 +376,9 @@ abstract class ClusterEndpointIT {
                     new ClusterConfigPatchRequestPartitions()
                         .count(partitionCount())
                         .replicationFactor(minReplicationFactor() + 1));
+
         // then
-        assertClusterScaleResponse(actuator, request);
+        verifyClusterScaleViaPatch(actuator, request);
       }
     }
 
@@ -390,8 +397,9 @@ abstract class ClusterEndpointIT {
                     new ClusterConfigPatchRequestPartitions()
                         .count(partitionCount())
                         .replicationFactor(minReplicationFactor() + 1));
+
         // then
-        assertClusterPatchResponse(actuator, request);
+        verifyClusterPatch(actuator, request);
       }
     }
 
@@ -403,14 +411,13 @@ abstract class ClusterEndpointIT {
         cluster.brokers().get(memberIdForBroker(1)).close();
         final var actuator = ClusterActuator.of(cluster.availableGateway());
 
-        // when - force remove broker 1
+        // when
         final var request =
             new ClusterConfigPatchRequest()
                 .brokers(new ClusterConfigPatchRequestBrokers().remove(List.of(brokerId(1))));
-        final var response = actuator.patchCluster(request, false, true);
 
         // then
-        assertThat(response.getExpectedTopology()).hasSize(brokerCount() - 1);
+        verifyForceRemoveBroker(actuator, request);
       }
     }
   }

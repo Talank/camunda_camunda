@@ -70,34 +70,39 @@ public class ScaleRequestTransformer implements ConfigurationChangeRequest {
     }
 
     // First add new members
-    return new AddMembersTransformer(members)
-        .operations(clusterConfiguration)
-        .map(this::addToOperations)
-        // then reassign partitions
-        .flatMap(
-            ignore ->
-                new PartitionReassignRequestTransformer(
-                        partitionDistributor, members, newReplicationFactor, newPartitionCount)
-                    .operations(clusterConfiguration))
-        .map(this::addToOperations)
-        // then remove members that are not part of the new configuration
-        .flatMap(
-            ignore -> {
-              final var membersToRemove =
-                  clusterConfiguration.members().keySet().stream()
-                      .filter(m -> !members.contains(m))
-                      .collect(Collectors.toSet());
-              return new RemoveMembersTransformer(membersToRemove).operations(clusterConfiguration);
-            })
-        .map(this::addToOperations)
-        .map(
-            list -> {
-              if (isBrokerScaling) {
-                final var postScaleOperation = new PostScalingOperation(coordinatorId, members);
-                list.add(postScaleOperation);
-              }
-              return list;
-            });
+    try {
+      return new AddMembersTransformer(members)
+          .operations(clusterConfiguration)
+          .map(this::addToOperations)
+          // then reassign partitions
+          .flatMap(
+              ignore ->
+                  new PartitionReassignRequestTransformer(
+                          partitionDistributor, members, newReplicationFactor, newPartitionCount)
+                      .operations(clusterConfiguration))
+          .map(this::addToOperations)
+          // then remove members that are not part of the new configuration
+          .flatMap(
+              ignore -> {
+                final var membersToRemove =
+                    clusterConfiguration.members().keySet().stream()
+                        .filter(m -> !members.contains(m))
+                        .collect(Collectors.toSet());
+                return new RemoveMembersTransformer(membersToRemove)
+                    .operations(clusterConfiguration);
+              })
+          .map(this::addToOperations)
+          .map(
+              list -> {
+                if (isBrokerScaling) {
+                  final var postScaleOperation = new PostScalingOperation(coordinatorId, members);
+                  list.add(postScaleOperation);
+                }
+                return list;
+              });
+    } catch (final Exception e) {
+      return Either.left(e);
+    }
   }
 
   private ArrayList<ClusterConfigurationChangeOperation> addToOperations(
