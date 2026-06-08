@@ -25,7 +25,6 @@ import io.camunda.zeebe.broker.partitioning.startup.PartitionStartupContext;
 import io.camunda.zeebe.broker.partitioning.startup.RaftPartitionFactory;
 import io.camunda.zeebe.broker.partitioning.startup.ZeebePartitionFactory;
 import io.camunda.zeebe.broker.partitioning.topology.ClusterConfigurationService;
-import io.camunda.zeebe.broker.partitioning.topology.TopologyManagerImpl;
 import io.camunda.zeebe.broker.system.configuration.BrokerCfg;
 import io.camunda.zeebe.broker.system.monitoring.BrokerHealthCheckService;
 import io.camunda.zeebe.broker.system.monitoring.DiskSpaceUsageMonitor;
@@ -62,17 +61,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public final class PartitionManagerImpl
-    implements PartitionManager, PartitionChangeExecutor, PartitionScalingChangeExecutor {
+public final class PartitionManagerImpl extends AbstractPartitionManager
+    implements PartitionChangeExecutor, PartitionScalingChangeExecutor {
 
   public static final String DEFAULT_GROUP_NAME = Protocol.DEFAULT_PARTITION_GROUP_NAME;
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionManagerImpl.class);
 
-  private final String partitionGroup;
-  private final ConcurrencyControl concurrencyControl;
   private final BrokerHealthCheckService healthCheckService;
-  private final ActorSchedulingService actorSchedulingService;
-  private final TopologyManagerImpl topologyManager;
   private final Map<Integer, Partition> partitions = new ConcurrentHashMap<>();
   private final DiskSpaceUsageMonitor diskSpaceUsageMonitor;
   private final BrokerClient brokerClient;
@@ -80,7 +75,6 @@ public final class PartitionManagerImpl
   private final BrokerCfg brokerCfg;
   private final ZeebePartitionFactory zeebePartitionFactory;
   private final RaftPartitionFactory raftPartitionFactory;
-  private final ClusterConfigurationService clusterConfigurationService;
   private final MeterRegistry brokerMeterRegistry;
   private final PartitionScalingChangeExecutor scalingExecutor;
 
@@ -107,24 +101,20 @@ public final class PartitionManagerImpl
       final EngineSecurityConfig securityConfig,
       final SearchClientsProxy searchClientsProxy,
       final BrokerRequestAuthorizationConverter brokerRequestAuthorizationConverter) {
-    this.partitionGroup = partitionGroup;
+    super(
+        partitionGroup,
+        concurrencyControl,
+        actorSchedulingService,
+        clusterConfigurationService,
+        clusterServices.getMembershipService(),
+        localBroker);
     this.brokerCfg = brokerCfg;
-    this.concurrencyControl = concurrencyControl;
-    this.actorSchedulingService = actorSchedulingService;
     this.healthCheckService = healthCheckService;
     this.diskSpaceUsageMonitor = diskSpaceUsageMonitor;
     this.brokerClient = brokerClient;
     scalingExecutor = new BrokerClientPartitionScalingExecutor(brokerClient, concurrencyControl);
     final var featureFlags = brokerCfg.getExperimental().getFeatures().toFeatureFlags();
-    this.clusterConfigurationService = clusterConfigurationService;
     brokerMeterRegistry = meterRegistry;
-    // Each physical tenant needs its own BrokerInfo instance so that concurrent TopologyManagerImpl
-    // actors don't overwrite each other's partition state. withPartitionGroup copies the
-    // broker-level fields and sets the correct group name for this tenant.
-    final var partitionGroupInfo = localBroker.withPartitionGroup(partitionGroup);
-    // TODO: Do this as a separate step before starting the partition manager
-    topologyManager =
-        new TopologyManagerImpl(clusterServices.getMembershipService(), partitionGroupInfo);
 
     final List<PartitionListener> listeners = new ArrayList<>(partitionListeners);
     listeners.add(topologyManager);
@@ -160,17 +150,9 @@ public final class PartitionManagerImpl
   }
 
   public void start() {
-    actorSchedulingService.submitActor(topologyManager);
-    final var localMemberId = managementService.getMembershipService().getLocalMember().id();
-    // The default physical tenant's partition distribution is the only one stored in dynamic
-    // config; other physical tenants derive their distribution by rewriting the group on every
-    // PartitionId.
-    final var groupDistribution =
-        clusterConfigurationService.getPartitionDistribution().withGroupName(partitionGroup);
-    final var memberPartitions =
-        groupDistribution.partitions().stream()
-            .filter(p -> p.members().contains(localMemberId))
-            .toList();
+    submitTopologyManager();
+    final var localMemberId = localMemberId();
+    final var memberPartitions = localPartitions();
 
     // BrokerHealthCheckService tracks a single set of bootstrap partitions. Only the default
     // physical tenant participates in the broker health check for now; other tenants are invisible.
@@ -336,7 +318,7 @@ public final class PartitionManagerImpl
             result.completeExceptionally(error);
           } else {
             partitions.clear();
-            topologyManager.closeAsync().onComplete(result);
+            closeTopologyManager().onComplete(result);
           }
         });
     return result;
