@@ -154,7 +154,7 @@ class JudgeEvaluationTest {
     // then
     assertThat(result.getScore()).isEqualTo(1.0);
     assertThat(capturedDocs.get()).containsExactly(doc);
-    assertThat(capturedPrompt.get()).contains("<resolved_documents>");
+    assertThat(capturedPrompt.get()).contains("</resolved_documents>");
     assertThat(capturedPrompt.get()).contains("documentId=\"doc-1\"");
   }
 
@@ -175,7 +175,7 @@ class JudgeEvaluationTest {
     evaluation.evaluate("value");
 
     // then
-    assertThat(capturedPrompt.get()).doesNotContain("<resolved_documents>");
+    assertThat(capturedPrompt.get()).doesNotContain("</resolved_documents>");
   }
 
   private static DocumentReferenceResponse refOf(
