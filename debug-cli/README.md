@@ -92,7 +92,6 @@ alias debug-cli="java -jar target/cdbg-${version}.jar"
   - `-e`, `--exporter-id`: Id of the exporter whose cursor should be reset.
   - `--position`: New `lastIncidentUpdatePosition`. Defaults to `-1` (reprocess all incidents from
     the start).
-  - `--partition-id`: Partition id, used only for logging.
   - `-v`, `--verbose`: Enable verbose output.
 - **Example:**
 
@@ -133,14 +132,14 @@ so each node holds two partition replicas and there are 6 replicas to patch:
    (`ls <data-dir>/raft-partition/partitions/<id>/snapshots/`) and run the command. Use a fresh
    empty `--runtime` directory per run. For the example above that is 6 runs:
 
-   | Run | Node  | `--root` …/partitions/ | `--partition-id` |
-   |-----|-------|------------------------|------------------|
-   | 1   | node0 | 1                      | 1                |
-   | 2   | node0 | 3                      | 3                |
-   | 3   | node1 | 1                      | 1                |
-   | 4   | node1 | 2                      | 2                |
-   | 5   | node2 | 2                      | 2                |
-   | 6   | node2 | 3                      | 3                |
+   | Run | Node  | `--root` …/partitions/ |
+   |-----|-------|------------------------|
+   | 1   | node0 | 1                      |
+   | 2   | node0 | 3                      |
+   | 3   | node1 | 1                      |
+   | 4   | node1 | 2                      |
+   | 5   | node2 | 2                      |
+   | 6   | node2 | 3                      |
 
 4. **Delete the stale snapshot** for each replica (the tool writes a new checksum-valid snapshot
    beside it and prints this as a next step).

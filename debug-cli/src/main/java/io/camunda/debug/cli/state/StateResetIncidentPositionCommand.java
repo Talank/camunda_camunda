@@ -88,11 +88,6 @@ public class StateResetIncidentPositionCommand implements Callable<Integer> {
       defaultValue = DEFAULT_RESET_POSITION)
   private long newPosition;
 
-  @Option(
-      names = {"--partition-id"},
-      description = "Partition id (informational, used for logging only)")
-  private Integer partitionId;
-
   private final ObjectMapper objectMapper = new ObjectMapper();
   private String validationError;
 
@@ -105,9 +100,6 @@ public class StateResetIncidentPositionCommand implements Callable<Integer> {
     validationError = null;
 
     if (verbose) {
-      if (partitionId != null) {
-        err.println("Partition ID: " + partitionId);
-      }
       err.println("Exporter ID: " + exporterId);
       err.println("New lastIncidentUpdatePosition: " + newPosition);
       err.println("Root path: " + root);
