@@ -120,10 +120,19 @@ final class ZoneAwareClusterEndpointIT extends ClusterEndpointIT {
           .isEqualTo(
               io.camunda.zeebe.management.cluster.PartitionDistributorConfig.TypeEnum.ZONE_AWARE);
       assertThat(topology.getPartitionDistributor().getZones())
-          .extracting(io.camunda.zeebe.management.cluster.ZoneSpec::getName)
-          .containsExactlyInAnyOrder(ZONES);
-      assertThat(topology.getPartitionDistributor().getZones())
-          .allMatch(z -> z.getNumberOfBrokers() > 0);
+          .satisfiesExactlyInAnyOrder(
+              z -> {
+                assertThat(z.getName()).isEqualTo(ZONES[0]); // zoneA: 2 brokers, 1 replica
+                assertThat(z.getNumberOfBrokers()).isEqualTo(2);
+                assertThat(z.getNumberOfReplicas()).isEqualTo(1);
+                assertThat(z.getPriority()).isEqualTo(100);
+              },
+              z -> {
+                assertThat(z.getName()).isEqualTo(ZONES[1]); // zoneB: 1 broker, 1 replica
+                assertThat(z.getNumberOfBrokers()).isEqualTo(1);
+                assertThat(z.getNumberOfReplicas()).isEqualTo(1);
+                assertThat(z.getPriority()).isEqualTo(10);
+              });
     }
   }
 
