@@ -596,12 +596,14 @@ export {
 } from './element-instance';
 export {
 	waitStateTypeSchema,
-	waitStateDetailsSchema,
+	jobWaitStateDetailsSchema,
+	messageWaitStateDetailsSchema,
 	elementInstanceInspectionSchema,
 	queryElementInstanceInspectionRequestBodySchema,
 	queryElementInstanceInspectionResponseBodySchema,
 	type WaitStateType,
-	type WaitStateDetails,
+	type JobWaitStateDetails,
+	type MessageWaitStateDetails,
 	type ElementInstanceInspection,
 	type QueryElementInstanceInspectionRequestBody,
 	type QueryElementInstanceInspectionResponseBody,

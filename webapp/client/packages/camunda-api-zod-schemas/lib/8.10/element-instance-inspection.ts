@@ -16,35 +16,52 @@ import {
 	type Endpoint,
 } from './common';
 import {elementInstanceTypeSchema} from './element-instance';
+import {jobKindSchema, listenerEventTypeSchema} from './job';
 
-const waitStateTypeSchema = z.enum(['JOB', 'MESSAGE', 'TIMER', 'SIGNAL', 'CONDITION', 'CHILD_INSTANCE']);
+const waitStateTypeSchema = z.enum(['JOB', 'MESSAGE']);
 type WaitStateType = z.infer<typeof waitStateTypeSchema>;
 
-const waitStateDetailsSchema = z.record(z.string(), z.unknown());
-type WaitStateDetails = z.infer<typeof waitStateDetailsSchema>;
+const jobWaitStateDetailsSchema = z.object({
+	jobKey: z.string(),
+	jobType: z.string(),
+	jobKind: jobKindSchema,
+	listenerEventType: listenerEventTypeSchema.nullable(),
+	retries: z.number().int().nullable(),
+});
+type JobWaitStateDetails = z.infer<typeof jobWaitStateDetailsSchema>;
+
+const messageWaitStateDetailsSchema = z.object({
+	messageName: z.string(),
+	correlationKey: z.string().nullable(),
+});
+type MessageWaitStateDetails = z.infer<typeof messageWaitStateDetailsSchema>;
 
 const elementInstanceInspectionSchema = z.object({
-	rootProcessInstanceKey: z.string(),
+	rootProcessInstanceKey: z.string().nullable(),
 	processInstanceKey: z.string(),
 	elementInstanceKey: z.string(),
 	elementId: z.string(),
 	elementType: elementInstanceTypeSchema,
+	tenantId: z.string(),
 	waitStateType: waitStateTypeSchema,
-	details: waitStateDetailsSchema,
+	jobDetails: jobWaitStateDetailsSchema.nullable(),
+	messageDetails: messageWaitStateDetailsSchema.nullable(),
 });
 type ElementInstanceInspection = z.infer<typeof elementInstanceInspectionSchema>;
 
 const queryElementInstanceInspectionFilterSchema = z
 	.object({
+		rootProcessInstanceKey: advancedStringFilterSchema,
 		processInstanceKey: advancedStringFilterSchema,
 		elementInstanceKey: advancedStringFilterSchema,
 		elementId: advancedStringFilterSchema,
+		elementType: z.union([elementInstanceTypeSchema, getEnumFilterSchema(elementInstanceTypeSchema)]),
 		waitStateType: z.union([waitStateTypeSchema, getEnumFilterSchema(waitStateTypeSchema)]),
 	})
 	.partial();
 
 const queryElementInstanceInspectionRequestBodySchema = getQueryRequestBodySchema({
-	sortFields: ['elementInstanceKey', 'processInstanceKey', 'elementId', 'waitStateType'] as const,
+	sortFields: ['elementInstanceKey', 'processInstanceKey', 'rootProcessInstanceKey', 'elementId'] as const,
 	filter: queryElementInstanceInspectionFilterSchema,
 });
 type QueryElementInstanceInspectionRequestBody = z.infer<typeof queryElementInstanceInspectionRequestBodySchema>;
@@ -61,7 +78,8 @@ const queryElementInstanceInspection: Endpoint = {
 
 export {
 	waitStateTypeSchema,
-	waitStateDetailsSchema,
+	jobWaitStateDetailsSchema,
+	messageWaitStateDetailsSchema,
 	elementInstanceInspectionSchema,
 	queryElementInstanceInspectionRequestBodySchema,
 	queryElementInstanceInspectionResponseBodySchema,
@@ -70,7 +88,8 @@ export {
 
 export type {
 	WaitStateType,
-	WaitStateDetails,
+	JobWaitStateDetails,
+	MessageWaitStateDetails,
 	ElementInstanceInspection,
 	QueryElementInstanceInspectionRequestBody,
 	QueryElementInstanceInspectionResponseBody,
