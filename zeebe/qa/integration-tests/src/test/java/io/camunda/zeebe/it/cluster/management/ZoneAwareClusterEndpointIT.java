@@ -37,11 +37,6 @@ final class ZoneAwareClusterEndpointIT extends ClusterEndpointIT {
   }
 
   @Override
-  protected int minReplicationFactor() {
-    return 2;
-  }
-
-  @Override
   @SuppressWarnings("resource")
   protected TestCluster createCluster(
       final int brokerCount, final int partitionCount, final int replicationFactor) {
@@ -56,18 +51,8 @@ final class ZoneAwareClusterEndpointIT extends ClusterEndpointIT {
   }
 
   @Override
-  protected MemberId memberIdForBroker(final int nodeIdx) {
-    return MemberId.from(ZONES[nodeIdx % ZONES.length], nodeIdx / ZONES.length);
-  }
-
-  private static List<Zone> zoneConfigs(final int brokerCount, final int replicationFactor) {
-    final var replicasZoneB = replicationFactor / 2;
-    final var replicasZoneA = replicationFactor - replicasZoneB;
-    final var brokersZoneB = brokerCount / ZONES.length;
-    final var brokersZoneA = brokerCount - brokersZoneB;
-    return List.of(
-        new Zone(ZONES[0], brokersZoneA, replicasZoneA, 100),
-        new Zone(ZONES[1], brokersZoneB, replicasZoneB, 10));
+  protected int minReplicationFactor() {
+    return 2;
   }
 
   @Override
@@ -79,6 +64,11 @@ final class ZoneAwareClusterEndpointIT extends ClusterEndpointIT {
   protected BrokerId brokerId(final int nodeIdx) {
     return new BrokerId.String(
         BrokerMemberId.from(ZONES[nodeIdx % ZONES.length], nodeIdx / ZONES.length).toString());
+  }
+
+  @Override
+  protected MemberId memberIdForBroker(final int nodeIdx) {
+    return MemberId.from(ZONES[nodeIdx % ZONES.length], nodeIdx / ZONES.length);
   }
 
   @Override
@@ -97,6 +87,16 @@ final class ZoneAwareClusterEndpointIT extends ClusterEndpointIT {
         .hasMessageContaining("zone-aware");
   }
 
+  private static List<Zone> zoneConfigs(final int brokerCount, final int replicationFactor) {
+    final var replicasZoneB = replicationFactor / 2;
+    final var replicasZoneA = replicationFactor - replicasZoneB;
+    final var brokersZoneB = brokerCount / ZONES.length;
+    final var brokersZoneA = brokerCount - brokersZoneB;
+    return List.of(
+        new Zone(ZONES[0], brokersZoneA, replicasZoneA, 100),
+        new Zone(ZONES[1], brokersZoneB, replicasZoneB, 10));
+  }
+
   @Test
   void shouldScaleZoneViaCount() {
     try (final var cluster = createCluster(minReplicationFactor())) {
@@ -109,10 +109,19 @@ final class ZoneAwareClusterEndpointIT extends ClusterEndpointIT {
           new ClusterConfigPatchRequest()
               .brokers(new ClusterConfigPatchRequestBrokers().count(brokerCount()).zone(zone()));
       final var response = actuator.patchCluster(request, true, false);
+      final var topology = actuator.getTopology();
 
       // then -- cluster grew by one (zoneA has an additional broker)
       assertThat(response.getExpectedTopology()).hasSize(brokerCount() + 1);
       assertThat(response.getPlannedChanges()).isNotEmpty();
+      // then -- topology reports zone-aware distributor config
+      assertThat(topology.getPartitionDistributor()).isNotNull();
+      assertThat(topology.getPartitionDistributor().getType())
+          .isEqualTo(
+              io.camunda.zeebe.management.cluster.PartitionDistributorConfig.TypeEnum.ZONE_AWARE);
+      assertThat(topology.getPartitionDistributor().getZones())
+          .extracting(io.camunda.zeebe.management.cluster.ZoneSpec::getName)
+          .containsExactlyInAnyOrder(ZONES);
     }
   }
 

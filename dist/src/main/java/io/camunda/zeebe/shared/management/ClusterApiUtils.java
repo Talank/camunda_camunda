@@ -42,6 +42,7 @@ import io.camunda.zeebe.dynamic.config.state.CompletedChange;
 import io.camunda.zeebe.dynamic.config.state.DynamicPartitionConfig;
 import io.camunda.zeebe.dynamic.config.state.ExporterState;
 import io.camunda.zeebe.dynamic.config.state.MemberState;
+import io.camunda.zeebe.dynamic.config.state.PartitionDistributorConfig;
 import io.camunda.zeebe.dynamic.config.state.PartitionState.State;
 import io.camunda.zeebe.dynamic.config.state.RoutingState;
 import io.camunda.zeebe.dynamic.config.state.RoutingState.MessageCorrelation.HashMod;
@@ -362,7 +363,38 @@ final class ClusterApiUtils {
         .routingState()
         .ifPresent(routingState -> response.routing(mapRoutingState(routingState)));
     topology.clusterId().ifPresent(response::clusterId);
+    topology
+        .partitionDistributorConfig()
+        .ifPresent(config -> response.partitionDistributor(mapPartitionDistributorConfig(config)));
     return response;
+  }
+
+  private static io.camunda.zeebe.management.cluster.PartitionDistributorConfig
+      mapPartitionDistributorConfig(final PartitionDistributorConfig config) {
+    return switch (config) {
+      case final PartitionDistributorConfig.RoundRobinConfig ignored ->
+          new io.camunda.zeebe.management.cluster.PartitionDistributorConfig()
+              .type(
+                  io.camunda.zeebe.management.cluster.PartitionDistributorConfig.TypeEnum
+                      .ROUND_ROBIN);
+      case final PartitionDistributorConfig.ZoneAwareConfig zoneAware ->
+          new io.camunda.zeebe.management.cluster.PartitionDistributorConfig()
+              .type(
+                  io.camunda.zeebe.management.cluster.PartitionDistributorConfig.TypeEnum
+                      .ZONE_AWARE)
+              .zones(
+                  zoneAware.zones().stream()
+                      .map(
+                          z ->
+                              new io.camunda.zeebe.management.cluster.ZoneSpec()
+                                  .name(z.name())
+                                  .numberOfReplicas(z.numberOfReplicas())
+                                  .priority(z.priority()))
+                      .toList());
+      case final PartitionDistributorConfig.FixedConfig ignored ->
+          new io.camunda.zeebe.management.cluster.PartitionDistributorConfig()
+              .type(io.camunda.zeebe.management.cluster.PartitionDistributorConfig.TypeEnum.FIXED);
+    };
   }
 
   private static io.camunda.zeebe.management.cluster.RoutingState mapRoutingState(
