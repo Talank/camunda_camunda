@@ -365,32 +365,40 @@ final class ClusterApiUtils {
     topology.clusterId().ifPresent(response::clusterId);
     topology
         .partitionDistributorConfig()
-        .ifPresent(config -> response.partitionDistributor(mapPartitionDistributorConfig(config)));
+        .ifPresent(
+            config ->
+                response.partitionDistributor(mapPartitionDistributorConfig(config, topology)));
     return response;
   }
 
   private static io.camunda.zeebe.management.cluster.PartitionDistributorConfig
-      mapPartitionDistributorConfig(final PartitionDistributorConfig config) {
+      mapPartitionDistributorConfig(
+          final PartitionDistributorConfig config, final ClusterConfiguration topology) {
     return switch (config) {
       case final PartitionDistributorConfig.RoundRobinConfig ignored ->
           new io.camunda.zeebe.management.cluster.PartitionDistributorConfig()
               .type(
                   io.camunda.zeebe.management.cluster.PartitionDistributorConfig.TypeEnum
                       .ROUND_ROBIN);
-      case final PartitionDistributorConfig.ZoneAwareConfig zoneAware ->
-          new io.camunda.zeebe.management.cluster.PartitionDistributorConfig()
-              .type(
-                  io.camunda.zeebe.management.cluster.PartitionDistributorConfig.TypeEnum
-                      .ZONE_AWARE)
-              .zones(
-                  zoneAware.zones().stream()
-                      .map(
-                          z ->
-                              new io.camunda.zeebe.management.cluster.ZoneSpec()
-                                  .name(z.name())
-                                  .numberOfReplicas(z.numberOfReplicas())
-                                  .priority(z.priority()))
-                      .toList());
+      case final PartitionDistributorConfig.ZoneAwareConfig zoneAware -> {
+        final var brokerCountByZone =
+            topology.members().keySet().stream()
+                .filter(m -> m.zone() != null)
+                .collect(Collectors.groupingBy(MemberId::zone, Collectors.summingInt(m -> 1)));
+        yield new io.camunda.zeebe.management.cluster.PartitionDistributorConfig()
+            .type(
+                io.camunda.zeebe.management.cluster.PartitionDistributorConfig.TypeEnum.ZONE_AWARE)
+            .zones(
+                zoneAware.zones().stream()
+                    .map(
+                        z ->
+                            new io.camunda.zeebe.management.cluster.ZoneSpec()
+                                .name(z.name())
+                                .numberOfReplicas(z.numberOfReplicas())
+                                .numberOfBrokers(brokerCountByZone.getOrDefault(z.name(), 0))
+                                .priority(z.priority()))
+                    .toList());
+      }
       case final PartitionDistributorConfig.FixedConfig ignored ->
           new io.camunda.zeebe.management.cluster.PartitionDistributorConfig()
               .type(io.camunda.zeebe.management.cluster.PartitionDistributorConfig.TypeEnum.FIXED);

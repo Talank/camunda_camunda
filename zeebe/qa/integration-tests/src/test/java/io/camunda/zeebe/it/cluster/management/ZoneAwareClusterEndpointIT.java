@@ -122,6 +122,8 @@ final class ZoneAwareClusterEndpointIT extends ClusterEndpointIT {
       assertThat(topology.getPartitionDistributor().getZones())
           .extracting(io.camunda.zeebe.management.cluster.ZoneSpec::getName)
           .containsExactlyInAnyOrder(ZONES);
+      assertThat(topology.getPartitionDistributor().getZones())
+          .allMatch(z -> z.getNumberOfBrokers() > 0);
     }
   }
 
