@@ -153,6 +153,7 @@ import io.camunda.gateway.protocol.model.UserSearchResult;
 import io.camunda.gateway.protocol.model.UserTaskResult;
 import io.camunda.gateway.protocol.model.UserTaskSearchQueryResult;
 import io.camunda.gateway.protocol.model.UserTaskStateEnum;
+import io.camunda.gateway.protocol.model.UserTaskWaitStateDetails;
 import io.camunda.gateway.protocol.model.VariableResult;
 import io.camunda.gateway.protocol.model.VariableSearchQueryResult;
 import io.camunda.gateway.protocol.model.VariableSearchResult;
@@ -211,6 +212,7 @@ import io.camunda.search.entities.VariableEntity;
 import io.camunda.search.entities.WaitStateEntity;
 import io.camunda.search.entities.WaitStateJobDetails;
 import io.camunda.search.entities.WaitStateMessageDetails;
+import io.camunda.search.entities.WaitStateUserTaskDetails;
 import io.camunda.search.query.SearchQueryResult;
 import io.camunda.security.api.model.authz.PermissionType;
 import io.camunda.security.api.model.user.CamundaUserDTO;
@@ -696,6 +698,7 @@ public final class SearchQueryResponseMapper {
                       .retries(retries)
                       .build())
               .messageDetails(null)
+              .userTaskDetails(null)
               .build();
       case WaitStateMessageDetails(final var messageName, final var correlationKey) ->
           base.jobDetails(null)
@@ -703,6 +706,16 @@ public final class SearchQueryResponseMapper {
                   MessageWaitStateDetails.Builder.create()
                       .messageName(messageName)
                       .correlationKey(correlationKey)
+                      .build())
+              .userTaskDetails(null)
+              .build();
+      case WaitStateUserTaskDetails(final var taskKey, final var dueDate) ->
+          base.jobDetails(null)
+              .messageDetails(null)
+              .userTaskDetails(
+                  UserTaskWaitStateDetails.Builder.create()
+                      .taskKey(keyToString(taskKey))
+                      .dueDate(dueDate)
                       .build())
               .build();
     };
