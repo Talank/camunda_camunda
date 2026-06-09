@@ -23,8 +23,8 @@ const JSON_DOCUMENT = readFileSync(
 const IMAGE_DOCUMENT = readFileSync(
   join(import.meta.dirname, '../mocks/resources/test_image.png'),
 );
-// Browser do not appear to load their PDF preview in Playwright.
-// Use a placeholder instead to have *something*.
+// Browsers do not appear to load the PDF preview in Playwright.
+// Use a placeholder instead so the modal has *something* to render.
 const PDF_DOCUMENT = 'Mock PDF content';
 
 test.beforeEach(async ({context}) => {
