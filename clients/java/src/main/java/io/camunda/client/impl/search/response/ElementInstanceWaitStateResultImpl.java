@@ -68,6 +68,10 @@ public class ElementInstanceWaitStateResultImpl implements ElementInstanceWaitSt
         return item.getMessageDetails() == null
             ? null
             : new MessageWaitStateDetailsImpl(item.getMessageDetails());
+      case USER_TASK:
+        return item.getUserTaskDetails() == null
+            ? null
+            : new UserTaskWaitStateDetailsImpl(item.getUserTaskDetails());
       default:
         return null;
     }
