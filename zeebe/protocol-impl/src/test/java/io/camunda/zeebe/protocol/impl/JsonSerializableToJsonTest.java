@@ -4847,19 +4847,19 @@ final class JsonSerializableToJsonTest {
             {
               "contentType": "TEXT",
               "text": "I will extract the line items from the invoice.",
-              "documentReference": { "documentId": "", "storeId": "", "contentHash": "" },
+              "documentReference": { "documentId": "", "storeId": "", "contentHash": "", "metadata": { "contentType": "", "fileName": "", "expiresAt": -1, "size": -1, "processDefinitionId": "", "processInstanceKey": -1, "customProperties": {} } },
               "object": {}
             },
             {
               "contentType": "DOCUMENT",
               "text": "",
-              "documentReference": { "documentId": "doc-001", "storeId": "gcs-store", "contentHash": "sha256-doc001" },
+              "documentReference": { "documentId": "doc-001", "storeId": "gcs-store", "contentHash": "sha256-doc001", "metadata": { "contentType": "", "fileName": "", "expiresAt": -1, "size": -1, "processDefinitionId": "", "processInstanceKey": -1, "customProperties": {} } },
               "object": {}
             },
             {
               "contentType": "OBJECT",
               "text": "",
-              "documentReference": { "documentId": "", "storeId": "", "contentHash": "" },
+              "documentReference": { "documentId": "", "storeId": "", "contentHash": "", "metadata": { "contentType": "", "fileName": "", "expiresAt": -1, "size": -1, "processDefinitionId": "", "processInstanceKey": -1, "customProperties": {} } },
               "object": { "page": 1 }
             }
           ],
