@@ -10,7 +10,6 @@ package io.camunda.zeebe.dynamic.config.api;
 import io.atomix.cluster.MemberId;
 import io.atomix.primitive.partition.PartitionId;
 import io.atomix.primitive.partition.PartitionMetadata;
-import io.camunda.zeebe.dynamic.config.PartitionDistributor;
 import io.camunda.zeebe.dynamic.config.api.ClusterConfigurationRequestFailedException.InvalidRequest;
 import io.camunda.zeebe.dynamic.config.changes.ConfigurationChangeCoordinator.ConfigurationChangeRequest;
 import io.camunda.zeebe.dynamic.config.state.ClusterConfiguration;
@@ -29,7 +28,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -41,24 +39,20 @@ import java.util.stream.Stream;
 public class PartitionReassignRequestTransformer implements ConfigurationChangeRequest {
 
   final Set<MemberId> members;
-  private final Supplier<PartitionDistributor> partitionDistributor;
   private final Optional<Integer> newReplicationFactor;
   private final Optional<Integer> newPartitionCount;
 
   public PartitionReassignRequestTransformer(
-      final Supplier<PartitionDistributor> partitionDistributor,
       final Set<MemberId> members,
       final Optional<Integer> newReplicationFactor,
       final Optional<Integer> newPartitionCount) {
-    this.partitionDistributor = partitionDistributor;
     this.members = members;
     this.newReplicationFactor = newReplicationFactor;
     this.newPartitionCount = newPartitionCount;
   }
 
-  public PartitionReassignRequestTransformer(
-      final Supplier<PartitionDistributor> partitionDistributor, final Set<MemberId> members) {
-    this(partitionDistributor, members, Optional.empty(), Optional.empty());
+  public PartitionReassignRequestTransformer(final Set<MemberId> members) {
+    this(members, Optional.empty(), Optional.empty());
   }
 
   @Override
@@ -135,8 +129,8 @@ public class PartitionReassignRequestTransformer implements ConfigurationChangeR
         Stream.of(oldPartitions, newPartitions).flatMap(List::stream).toList();
 
     final var newDistribution =
-        partitionDistributor
-            .get()
+        currentConfiguration
+            .partitionDistributor()
             .distributePartitions(brokers, allPartitions, replicationFactor)
             .stream()
             .collect(Collectors.toMap(PartitionMetadata::id, p -> p));

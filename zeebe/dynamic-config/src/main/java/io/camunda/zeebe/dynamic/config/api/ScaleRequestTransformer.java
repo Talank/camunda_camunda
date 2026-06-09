@@ -8,7 +8,6 @@
 package io.camunda.zeebe.dynamic.config.api;
 
 import io.atomix.cluster.MemberId;
-import io.camunda.zeebe.dynamic.config.PartitionDistributor;
 import io.camunda.zeebe.dynamic.config.changes.ConfigurationChangeCoordinator.ConfigurationChangeRequest;
 import io.camunda.zeebe.dynamic.config.state.ClusterConfiguration;
 import io.camunda.zeebe.dynamic.config.state.ClusterConfigurationChangeOperation;
@@ -19,7 +18,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public class ScaleRequestTransformer implements ConfigurationChangeRequest {
@@ -29,26 +27,20 @@ public class ScaleRequestTransformer implements ConfigurationChangeRequest {
   private final Optional<Integer> newPartitionCount;
   private final ArrayList<ClusterConfigurationChangeOperation> generatedOperations =
       new ArrayList<>();
-  private final Supplier<PartitionDistributor> partitionDistributor;
 
-  public ScaleRequestTransformer(
-      final Supplier<PartitionDistributor> partitionDistributor, final Set<MemberId> members) {
-    this(partitionDistributor, members, Optional.empty());
+  public ScaleRequestTransformer(final Set<MemberId> members) {
+    this(members, Optional.empty());
   }
 
   public ScaleRequestTransformer(
-      final Supplier<PartitionDistributor> partitionDistributor,
-      final Set<MemberId> members,
-      final Optional<Integer> newReplicationFactor) {
-    this(partitionDistributor, members, newReplicationFactor, Optional.empty());
+      final Set<MemberId> members, final Optional<Integer> newReplicationFactor) {
+    this(members, newReplicationFactor, Optional.empty());
   }
 
   public ScaleRequestTransformer(
-      final Supplier<PartitionDistributor> partitionDistributor,
       final Set<MemberId> members,
       final Optional<Integer> newReplicationFactor,
       final Optional<Integer> newPartitionCount) {
-    this.partitionDistributor = partitionDistributor;
     this.members = members;
     this.newReplicationFactor = newReplicationFactor;
     this.newPartitionCount = newPartitionCount;
@@ -78,7 +70,7 @@ public class ScaleRequestTransformer implements ConfigurationChangeRequest {
           .flatMap(
               ignore ->
                   new PartitionReassignRequestTransformer(
-                          partitionDistributor, members, newReplicationFactor, newPartitionCount)
+                          members, newReplicationFactor, newPartitionCount)
                       .operations(clusterConfiguration))
           .map(this::addToOperations)
           // then remove members that are not part of the new configuration

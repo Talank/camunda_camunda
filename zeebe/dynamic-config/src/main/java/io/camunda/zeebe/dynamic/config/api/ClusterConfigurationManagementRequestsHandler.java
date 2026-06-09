@@ -8,7 +8,6 @@
 package io.camunda.zeebe.dynamic.config.api;
 
 import io.atomix.cluster.MemberId;
-import io.camunda.zeebe.dynamic.config.PartitionDistributor;
 import io.camunda.zeebe.dynamic.config.api.ClusterConfigurationManagementRequest.AddMembersRequest;
 import io.camunda.zeebe.dynamic.config.api.ClusterConfigurationManagementRequest.BrokerScaleRequest;
 import io.camunda.zeebe.dynamic.config.api.ClusterConfigurationManagementRequest.CancelChangeRequest;
@@ -37,7 +36,6 @@ import io.camunda.zeebe.util.Either;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * Handles the requests for the configuration management. This is expected be running on the
@@ -46,17 +44,14 @@ import java.util.function.Supplier;
 public final class ClusterConfigurationManagementRequestsHandler
     implements ClusterConfigurationManagementApi {
   private final ConfigurationChangeCoordinator coordinator;
-  private final Supplier<PartitionDistributor> partitionDistributor;
   private final ConcurrencyControl executor;
   private final MemberId localMemberId;
 
   public ClusterConfigurationManagementRequestsHandler(
       final ConfigurationChangeCoordinator coordinator,
-      final Supplier<PartitionDistributor> partitionDistributor,
       final MemberId localMemberId,
       final ConcurrencyControl executor) {
     this.coordinator = coordinator;
-    this.partitionDistributor = partitionDistributor;
     this.executor = executor;
     this.localMemberId = localMemberId;
   }
@@ -110,8 +105,7 @@ public final class ClusterConfigurationManagementRequestsHandler
       final ReassignPartitionsRequest reassignPartitionsRequest) {
     return handleRequest(
         reassignPartitionsRequest.dryRun(),
-        new PartitionReassignRequestTransformer(
-            partitionDistributor, reassignPartitionsRequest.members()));
+        new PartitionReassignRequestTransformer(reassignPartitionsRequest.members()));
   }
 
   @Override
@@ -120,7 +114,6 @@ public final class ClusterConfigurationManagementRequestsHandler
     return handleRequest(
         scaleRequest.dryRun(),
         new ScaleRequestTransformer(
-            partitionDistributor,
             scaleRequest.members(),
             scaleRequest.newReplicationFactor(),
             scaleRequest.newPartitionCount()));
@@ -153,7 +146,6 @@ public final class ClusterConfigurationManagementRequestsHandler
     return handleRequest(
         clusterScaleRequest.dryRun(),
         new ClusterScaleRequestTransformer(
-            partitionDistributor,
             clusterScaleRequest.newClusterSize(),
             clusterScaleRequest.newPartitionCount(),
             clusterScaleRequest.newReplicationFactor()));
@@ -166,7 +158,6 @@ public final class ClusterConfigurationManagementRequestsHandler
     return handleRequest(
         clusterPatchRequest.dryRun(),
         new ClusterPatchRequestTransformer(
-            partitionDistributor,
             clusterPatchRequest.membersToAdd(),
             clusterPatchRequest.membersToRemove(),
             clusterPatchRequest.newPartitionCount(),
