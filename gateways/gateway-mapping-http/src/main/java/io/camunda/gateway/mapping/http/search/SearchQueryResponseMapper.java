@@ -715,7 +715,7 @@ public final class SearchQueryResponseMapper {
               .userTaskDetails(
                   UserTaskWaitStateDetails.Builder.create()
                       .taskKey(keyToString(taskKey))
-                      .dueDate(dueDate)
+                      .dueDate(dueDate == null || dueDate.isBlank() ? null : dueDate)
                       .build())
               .build();
     };
