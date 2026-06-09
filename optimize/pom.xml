@@ -47,9 +47,9 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <camunda.maven.artifacts.version>7.22.0</camunda.maven.artifacts.version>
 
-    <zeebe.version>${project.version}</zeebe.version>
+    <zeebe.version>8.8.26-SNAPSHOT</zeebe.version>
     <!-- This is used in the start-backend.js script to determine the backing Camunda version -->
-    <camunda.docker.version>8.8-SNAPSHOT</camunda.docker.version>
+    <camunda.docker.version>8.8.10</camunda.docker.version>
     <!-- We use this for the Zeebe test container version only -->
     <zeebe.docker.version>8.7.0-alpha4</zeebe.docker.version>
 
