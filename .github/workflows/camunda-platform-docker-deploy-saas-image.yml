@@ -1,21 +1,7 @@
-# type: CI Helper - Manual
-# owner: @camunda/monorepo-devops-team
----
 name: Deploy Camunda Docker Images to SaaS registry
 
 on:
   workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch to deploy an image for'
-        required: true
-        type: string
-      camunda-image-only:
-        description: 'Whether to build the camunda/camunda image only'
-        required: false
-        default: false
-        type: boolean
-
 defaults:
   run:
     # use bash shell by default to ensure pipefail behavior is the default
@@ -97,7 +83,7 @@ jobs:
       - uses: ./.github/actions/build-platform-docker
         id: build-push-zeebe-docker
         name: Build & Push zeebe-io/zeebe
-        if: ${{ !inputs.camunda-image-only }}
+        if: always()
         with:
           repository: europe-docker.pkg.dev/camunda-saas-registry/zeebe-io/zeebe
           version: ${{ steps.image-tag.outputs.image-tag }}
@@ -108,7 +94,7 @@ jobs:
       - uses: ./.github/actions/build-platform-docker
         id: build-push-operate-docker
         name: Build & Push zeebe-io/operate
-        if: ${{ !inputs.camunda-image-only }}
+        if: always()
         with:
           repository: europe-docker.pkg.dev/camunda-saas-registry/zeebe-io/operate
           version: ${{ steps.image-tag.outputs.image-tag }}
@@ -119,7 +105,7 @@ jobs:
       - uses: ./.github/actions/build-platform-docker
         id: build-push-tasklist-docker
         name: Build & Push zeebe-io/tasklist
-        if: ${{ !inputs.camunda-image-only }}
+        if: always()
         with:
           repository: europe-docker.pkg.dev/camunda-saas-registry/zeebe-io/tasklist
           version: ${{ steps.image-tag.outputs.image-tag }}
@@ -130,7 +116,7 @@ jobs:
       - uses: ./.github/actions/build-platform-docker
         id: build-push-optimize-docker
         name: Build & Push zeebe-io/optimize
-        if: ${{ !inputs.camunda-image-only }}
+        if: always()
         with:
           repository: europe-docker.pkg.dev/camunda-saas-registry/zeebe-io/optimize
           version: ${{ steps.image-tag.outputs.image-tag }}
@@ -138,3 +124,5 @@ jobs:
           platforms: ${{ env.DOCKER_PLATFORMS }}
           dockerfile: optimize.Dockerfile
           push: true
+    strategy:
+      fail-fast: false

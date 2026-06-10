@@ -18,194 +18,6 @@
 name: Camunda load test
 on:
   workflow_dispatch:
-    inputs:
-      name:
-        description: 'Name of the load test (used as the Kubernetes namespace)'
-        required: true
-      ref:
-        description: 'Git ref (branch, tag or commit SHA) to build and test against'
-        default: 'main'
-        type: string
-        required: false
-      scenario:
-        description: 'Workload scenario to run.'
-        required: false
-        type: choice
-        options:
-          - latency
-          - realistic
-          - typical
-          - max
-          - archiver
-        default: max
-      secondary-storage-type:
-        description: 'Secondary database backend for Camunda Platform'
-        type: choice
-        options:
-        - elasticsearch
-        - opensearch
-        - postgresql
-        - mysql
-        - mariadb
-        - mssql
-        - oracle
-        - none
-        default: elasticsearch
-      reuse-tag:
-        description: 'Pre-built image tag from the internal registry (registry.camunda.cloud). Skips the build step. ⚠ Cannot be used with orchestration-tag.'
-        type: string
-        default: ""
-        required: false
-      load-test-load:
-        description: '── Configuration ─────────────────── Helm args for workload components (e.g. --set starter.rate=100).'
-        required: false
-      platform-helm-values:
-        description: 'Additional Helm values for the Camunda platform chart (e.g. --set orchestration.resources.limits.memory=2Gi)'
-        type: string
-        default: ""
-        required: false
-      stable-vms:
-        description: 'Deploy to non-spot VMs (more stable, higher cost)'
-        type: boolean
-        required: false
-        default: false
-      enable-optimize:
-        description: 'Enable Optimize for load testing'
-        type: boolean
-        required: false
-        default: true
-      enable-optimize-report-metrics:
-        description: 'Enable the load-tester Optimize report-evaluation meter (requires Optimize backend)'
-        type: boolean
-        required: false
-        default: false
-      build-frontend:
-        description: 'Build frontend assets as part of the load test image build'
-        type: boolean
-        required: false
-        default: false
-      perform-read-benchmarks:
-        description: 'Run continuous read benchmarks on secondary storage (may affect exporter performance)'
-        type: boolean
-        required: false
-        default: false
-      ttl:
-        description: '── Lifecycle & advanced ──────────── Days before the namespace is auto-deleted'
-        type: number
-        default: 1
-        required: false
-      orchestration-tag:
-        description: 'Official Docker Hub image tag (docker.io/camunda/camunda). Uses Docker Hub instead of building. ⚠ Cannot be used with reuse-tag.'
-        type: string
-        default: ""
-        required: false
-      optimize-tag:
-        description: 'Override Optimize image tag (docker.io/camunda/optimize). Overrides build mode defaults.'
-        type: string
-        default: ""
-        required: false
-      identity-tag:
-        description: 'Override Identity image tag (docker.io/camunda/identity). Defaults to Helm chart default.'
-        type: string
-        default: ""
-        required: false
-      connectors-tag:
-        description: 'Override Connectors image tag (docker.io/camunda/connectors). Defaults to Helm chart default.'
-        type: string
-        default: ""
-        required: false
-  workflow_call:
-    inputs:
-      ref:
-        description: 'Specifies the ref (e.g. branch name, commit sha or tag) from which the docker image is built and used to run the load test against'
-        default: 'main'
-        type: string
-        required: false
-      name:
-        description: 'Specifies the name of the load test'
-        type: string
-        required: true
-      ttl:
-        description: 'Specifies after how many days the load test namespace should be deleted'
-        type: number
-        default: 1
-        required: false
-      reuse-tag:
-        description: 'Reuse Tag: Pre-built image tag from the internal registry (registry.camunda.cloud). Skips the docker image build step. Cannot be used together with orchestration-tag.'
-        type: string
-        default: ""
-        required: false
-      scenario:
-        description: 'Workload scenario to run. Options: latency, realistic, typical, max, archiver.'
-        type: string
-        required: false
-        default: ""
-      load-test-load:
-        description: 'Specifies which load test components to deploy. For example, `starter` can be assigned with the rate at which they start instances. Allows arbitrary helm arguments, like --set starter.rate=100. Can be combined with any scenario, or used alone when scenario is empty.'
-        type: string
-        required: false
-      platform-helm-values:
-        description: 'Allows to specify additional values/configurations for the Camunda platform Helm chart, which will be deployed. For example, the Orchestration cluster `resources` can be modified. Allows arbitrary helm arguments, like --set orchestration.resources.limits.memory=2Gi'
-        type: string
-        default: ""
-        required: false
-      publish:
-        description: 'Where to publish the results, can be "slack" or "comment"'
-        default: ""
-        type: string
-        required: false
-      perform-read-benchmarks:
-        description: 'Perform continuous read benchmarks on secondary storage. This may influence the exporter performance as it puts more load on the secondary database. The metrics are available in the Data-Layer dashboard.'
-        type: boolean
-        required: false
-        default: false
-      stable-vms:
-        description: 'Deploy to non-spot VMs'
-        type: boolean
-        required: false
-        default: false
-      enable-optimize:
-        description: 'Enable Optimize for load testing'
-        type: boolean
-        required: false
-        default: true
-      enable-optimize-report-metrics:
-        description: 'Enable the load-tester Optimize report-evaluation meter (requires Optimize backend)'
-        type: boolean
-        required: false
-        default: false
-      build-frontend:
-        description: 'Build the frontend as part of the load test image build'
-        type: boolean
-        required: false
-        default: false
-      secondary-storage-type:
-        description: 'Specifies the type of the secondary database used by Camunda Platform, can be "elasticsearch", "opensearch", "postgresql", "mysql", "mariadb", "mssql", "oracle" or "none"'
-        # type choice is invalid here
-        type: string
-        required: false
-        default: elasticsearch
-      orchestration-tag:
-        description: 'Orchestration Tag: Docker image tag for official Camunda images from Docker Hub (docker.io/camunda/camunda). When set, official Docker Hub images are used instead of building from source. Cannot be used together with reuse-tag.'
-        type: string
-        default: ""
-        required: false
-      optimize-tag:
-        description: 'Optimize Tag: Docker image tag for Optimize from Docker Hub (docker.io/camunda/optimize). When set, overrides the optimize image regardless of build mode. If not set, custom builds use the built image from the internal registry; official images use Helm chart defaults.'
-        type: string
-        default: ""
-        required: false
-      identity-tag:
-        description: 'Identity Tag: Docker image tag for Identity from Docker Hub (docker.io/camunda/identity). If not set, defaults to the Helm chart default image.'
-        type: string
-        default: ""
-        required: false
-      connectors-tag:
-        description: 'Connectors Tag: Docker image tag for Connectors from Docker Hub (docker.io/camunda/connectors). If not set, defaults to the Helm chart default image.'
-        type: string
-        default: ""
-        required: false
-
 env:
   CLUSTER: camunda-benchmark-prod  # change this to "camunda-benchmark-dev" when experimenting
   TELEPORT_JOIN_TOKEN: infra-benchmark-prod-github-action-zeebe  # change this to "infra-benchmark-dev-github-action-zeebe" when experimenting
@@ -258,9 +70,10 @@ jobs:
     name: Calculate Image Tag
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: { }
+    permissions: {}
     outputs:
-      image-tag: ${{ inputs.orchestration-tag != '' && inputs.orchestration-tag || (inputs.reuse-tag != '' && inputs.reuse-tag || steps.image-tag.outputs.image-tag) }}
+      image-tag: ${{ inputs.orchestration-tag != '' && inputs.orchestration-tag || (inputs.reuse-tag != '' && 
+        inputs.reuse-tag || steps.image-tag.outputs.image-tag) }}
     steps:
       - name: Validate mutually exclusive inputs
         if: ${{ inputs.orchestration-tag != '' && inputs.reuse-tag != '' }}
@@ -278,7 +91,8 @@ jobs:
           echo "image-tag=${image_tag}" >> "$GITHUB_OUTPUT"
           echo "**Built image tag:** \`${image_tag}\`" >> "$GITHUB_STEP_SUMMARY"
       - name: Validate Docker image tags exist
-        if: ${{ inputs.orchestration-tag != '' || inputs.optimize-tag != '' || inputs.identity-tag != '' || inputs.connectors-tag != '' }}
+        if: ${{ inputs.orchestration-tag != '' || inputs.optimize-tag != '' || inputs.identity-tag != '' || 
+          inputs.connectors-tag != '' }}
         env:
           ORCHESTRATION_TAG: ${{ inputs.orchestration-tag }}
           ENABLE_OPTIMIZE: ${{ inputs.enable-optimize }}
@@ -388,7 +202,8 @@ jobs:
         name: Build Camunda Platform
         id: build-camunda
         with:
-          maven-extra-args: -PskipFrontendBuild ${{ inputs.enable-optimize && '-Pinclude-optimize' || '-P\!include-optimize' }}
+          maven-extra-args: -PskipFrontendBuild ${{ inputs.enable-optimize && '-Pinclude-optimize' || 
+            '-P\!include-optimize' }}
       - uses: ./.github/actions/build-platform-docker
         name: Build Camunda Docker Image
         with:
@@ -420,7 +235,7 @@ jobs:
 
   build-load-test-images:
     name: Build Starter and Worker
-    if: ${{ inputs.reuse-tag == '' || inputs.orchestration-tag != '' }}
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: calculate-image-tag
@@ -440,9 +255,11 @@ jobs:
           vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
       - run: ./mvnw -B -D skipTests -D skipChecks -P\!include-optimize -pl load-tests/load-tester -am install
       - name: Build Starter Image
-        run: ./mvnw -pl load-tests/load-tester jib:build -P starter -P\!include-optimize -D image="${{ env.IMAGE_REPOSITORY }}/starter:${{ needs.calculate-image-tag.outputs.image-tag }}"
+        run: ./mvnw -pl load-tests/load-tester jib:build -P starter -P\!include-optimize -D image="${{ 
+          env.IMAGE_REPOSITORY }}/starter:${{ needs.calculate-image-tag.outputs.image-tag }}"
       - name: Build Worker Image
-        run: ./mvnw -pl load-tests/load-tester jib:build -P worker -P\!include-optimize -D image="${{ env.IMAGE_REPOSITORY }}/worker:${{ needs.calculate-image-tag.outputs.image-tag }}"
+        run: ./mvnw -pl load-tests/load-tester jib:build -P worker -P\!include-optimize -D image="${{ 
+          env.IMAGE_REPOSITORY }}/worker:${{ needs.calculate-image-tag.outputs.image-tag }}"
       - name: Observe build status
         if: always()
         continue-on-error: true
@@ -453,6 +270,8 @@ jobs:
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
 
+    strategy:
+      fail-fast: false
   deploy-cluster-under-test:
     name: Deploy cluster under test
     needs:
@@ -485,15 +304,15 @@ jobs:
       - name: Set up Teleport
         uses: teleport-actions/setup@b638ff596557cc3959eb6b5287d5e58e0c8ac6a6 # v1.1.1
         with:
-            proxy: camunda.teleport.sh:443
-            version: auto
+          proxy: camunda.teleport.sh:443
+          version: auto
 
       - name: Authenticate to Cluster using Teleport
         uses: teleport-actions/auth-k8s@0f46164469ae4fcd4d359d40e06bab17d4be17c9 # v2.0.6
         with:
-            proxy: camunda.teleport.sh:443
-            token: ${{ env.TELEPORT_JOIN_TOKEN }}
-            kubernetes-cluster: ${{ env.CLUSTER }}
+          proxy: camunda.teleport.sh:443
+          token: ${{ env.TELEPORT_JOIN_TOKEN }}
+          kubernetes-cluster: ${{ env.CLUSTER }}
 
       - name: Print tool versions
         run: |

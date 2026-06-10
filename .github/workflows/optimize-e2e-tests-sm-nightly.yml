@@ -5,8 +5,6 @@
 name: Optimize E2E Self-Managed (Nightly)
 
 on:
-  schedule:
-    - cron: "0 2 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -141,3 +139,5 @@ jobs:
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           user_description: "team-core-features"
+    strategy:
+      fail-fast: false

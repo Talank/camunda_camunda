@@ -10,16 +10,6 @@ name: AWS OpenSearch Manual/Scheduled Run Integration Tests
 
 on:
   workflow_dispatch:
-    inputs:
-      opensearch-version:
-        description: Version of AWS OpenSearch
-        type: choice
-        options:
-          - "2.19"
-          - "3.5"
-  schedule:
-    - cron: "0 4 * * Mon-Fri"
-
 defaults:
   run:
     # use bash shell by default to ensure pipefail behavior is the default
@@ -84,11 +74,11 @@ jobs:
       matrix:
         os_version: ${{ fromJSON(format('[{0}]', github.event.inputs.opensearch-version || '"2.19", "3.5"')) }}
         group:
-        - camunda-qa-acceptance-tests-client
-        - camunda-qa-acceptance-tests-non-client
-        - search-client-opensearch
-        - camunda-exporter
-        - zeebe-opensearch-exporter
+          - camunda-qa-acceptance-tests-client
+          - camunda-qa-acceptance-tests-non-client
+          - search-client-opensearch
+          - camunda-exporter
+          - zeebe-opensearch-exporter
         include:
           - group: camunda-qa-acceptance-tests-client
             name: "Camunda QA Module Client Tests"
@@ -174,7 +164,7 @@ jobs:
           buildOutputFilePath: ${{ env.BUILD_OUTPUT_FILE_PATH }}
       - name: Upload test artifacts
         uses: ./.github/actions/collect-test-artifacts
-        if: ${{ failure() || cancelled() || steps.analyze-test-run.outputs.flakyTests != '' }}
+        if: always()
         with:
           name: "[IT] ${{ matrix.name }}"
       - name: Observe build status
@@ -199,39 +189,39 @@ jobs:
       contents: read
       actions: write
     steps:
-    - name: Import secrets from Vault
-      id: secrets
-      uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
-      with:
-        url: ${{ secrets.VAULT_ADDR }}
-        method: approle
-        roleId: ${{ secrets.VAULT_ROLE_ID }}
-        secretId: ${{ secrets.VAULT_SECRET_ID }}
-        secrets: |
-          secret/data/products/camunda/ci/github-actions DATA_ENGINE_CI_ALERT_WEBHOOK_URL;
-    - name: Send notification
-      uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
-      with:
-        webhook: ${{ steps.secrets.outputs.DATA_ENGINE_CI_ALERT_WEBHOOK_URL }}
-        webhook-type: webhook-trigger
+      - name: Import secrets from Vault
+        id: secrets
+        uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          secrets: |
+            secret/data/products/camunda/ci/github-actions DATA_ENGINE_CI_ALERT_WEBHOOK_URL;
+      - name: Send notification
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
+        with:
+          webhook: ${{ steps.secrets.outputs.DATA_ENGINE_CI_ALERT_WEBHOOK_URL }}
+          webhook-type: webhook-trigger
         # For posting a rich message using Block Kit
-        payload: |
-          text: "AWS OpenSearch Manual/Scheduled Run Integration Tests failed or were cancelled"
-          blocks:
-            - type: "section"
-              text:
-                type: "mrkdwn"
-                text: "AWS OpenSearch Manual/Scheduled Run Integration Tests FAILED or WERE CANCELLED\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-    - name: Checkout
-      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      with:
-        sparse-checkout: .github
-    - name: Observe build status
-      if: always()
-      continue-on-error: true
-      uses: ./.github/actions/observe-build-status
-      with:
-        build_status: ${{ job.status }}
-        secret_vault_address: ${{ secrets.VAULT_ADDR }}
-        secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
-        secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
+          payload: |
+            text: "AWS OpenSearch Manual/Scheduled Run Integration Tests failed or were cancelled"
+            blocks:
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: "AWS OpenSearch Manual/Scheduled Run Integration Tests FAILED or WERE CANCELLED\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          sparse-checkout: .github
+      - name: Observe build status
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/observe-build-status
+        with:
+          build_status: ${{ job.status }}
+          secret_vault_address: ${{ secrets.VAULT_ADDR }}
+          secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}

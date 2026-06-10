@@ -1,28 +1,11 @@
-# description: The Unified CI for the monorepo. This workflow runs tests for all modules in the monorepo. Any new tests are required to adhere to inclusion rules
-# test location: /
-# type: CI
-# owner: @camunda/monorepo-devops-team
----
 name: CI
 
 on:
-  push:
-    branches:
-      - main
-      - stable/*
-      - release-*
-  pull_request: {}
-  merge_group: {}
-  workflow_dispatch: {}
-  schedule:
-    - cron: '0 6 * * *' # daily full build in the morning to re-populate GHA caches
-
-# Limit workflow to 1 concurrent run per ref (branch) and trigger event (push/schedule/etc): new commit -> old runs are canceled to save costs
-# Exception for main + stable/* branches: complete builds for every commit needed for confidenence
-# Exception for deploy jobs that have to wait for each other to avoid overwriting
+  workflow_dispatch:
 concurrency:
   cancel-in-progress: true
-  group: ${{ format('{0}-{1}-{2}', github.workflow, github.event_name, (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/stable/')) && github.sha || github.ref) }}
+  group: ${{ format('{0}-{1}-{2}', github.workflow, github.event_name, (github.ref == 'refs/heads/main' || 
+    startsWith(github.ref, 'refs/heads/stable/')) && github.sha || github.ref) }}
 
 defaults:
   run:
@@ -77,10 +60,10 @@ jobs:
   actionlint:
     if: needs.detect-changes.outputs.actionlint == 'true'
     name: "Lint / Actionlint"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     env:
       # renovate: datasource=github-releases depName=rhysd/actionlint
       ACTIONLINT_VERSION: '1.7.12'
@@ -120,7 +103,7 @@ jobs:
     # break those builds.
     if: github.event_name == 'pull_request' && needs.detect-changes.outputs.actionlint == 'true'
     name: "Lint / Action Pinning"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     uses: ./.github/workflows/check-action-pins.yml
     secrets: inherit
     permissions:
@@ -130,10 +113,10 @@ jobs:
   commitlint:
     if: needs.detect-changes.outputs.commitlint == 'true'
     name: "Lint / Commitlint"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     steps:
       - uses: camunda/infra-global-github-actions/start-build-monitor@main
       - name: Determine fetch depth for checkout
@@ -151,7 +134,9 @@ jobs:
           helpURL: https://github.com/camunda/camunda/blob/main/CONTRIBUTING.md#commit-message-guidelines
       - name: Post failure hint
         if: failure()
-        run: echo "::error::Found commit message guideline violations! Check https://github.com/camunda/camunda/blob/main/CONTRIBUTING.md#commit-message-guidelines and in exceptional cases, document the reasoning and add the ci:ignore-commitlint PR label."
+        run: echo "::error::Found commit message guideline violations! Check 
+          https://github.com/camunda/camunda/blob/main/CONTRIBUTING.md#commit-message-guidelines and in exceptional 
+          cases, document the reasoning and add the ci:ignore-commitlint PR label."
       - name: Observe build status
         if: always()
         continue-on-error: true
@@ -163,12 +148,12 @@ jobs:
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
 
   maven-spotless-linter:
-    if: needs.detect-changes.outputs.maven-spotless-linter == 'true'
+    if: always()
     name: "Lint / Maven Spotless"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     steps:
       - uses: camunda/infra-global-github-actions/start-build-monitor@main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -190,13 +175,15 @@ jobs:
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
 
+    strategy:
+      fail-fast: false
   junit-vintage-check:
     if: needs.detect-changes.outputs.java-code-changes == 'true'
     name: "Lint / JUnit Vintage Engine"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     steps:
       - uses: camunda/infra-global-github-actions/start-build-monitor@main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -214,12 +201,12 @@ jobs:
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
 
   validate-pom-metadata:
-    if: needs.detect-changes.outputs.validate-pom-metadata == 'true'
+    if: always()
     name: "Lint / Flattened POM Metadata"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     steps:
       - uses: camunda/infra-global-github-actions/start-build-monitor@main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -245,13 +232,15 @@ jobs:
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
 
+    strategy:
+      fail-fast: false
   codeowners-check:
     if: needs.detect-changes.outputs.codeowners-check == 'true'
     name: "Lint / Codeowners"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     steps:
       - uses: camunda/infra-global-github-actions/start-build-monitor@main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -278,11 +267,11 @@ jobs:
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
 
   java-checks:
-    if: needs.detect-changes.outputs.java-code-changes == 'true'
+    if: always()
     name: "Java Checks"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     timeout-minutes: 20
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     runs-on: gcp-perf-core-8-default
     steps:
       - uses: camunda/infra-global-github-actions/start-build-monitor@main
@@ -295,7 +284,8 @@ jobs:
           vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
           vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
       # Not running Maven Spotless here since it is checked in a dedicated job
-      - run: ./mvnw -T1C -B -D skipTests -Dspotless.check.skip=true -P !autoFormat,checkFormat,spotbugs,skipFrontendBuild verify
+      - run: ./mvnw -T1C -B -D skipTests -Dspotless.check.skip=true -P 
+          !autoFormat,checkFormat,spotbugs,skipFrontendBuild verify
       - name: Observe build status
         if: always()
         continue-on-error: true
@@ -306,14 +296,16 @@ jobs:
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
 
+    strategy:
+      fail-fast: false
   dependency-cycle-check:
     # Temporarily disabling the dependency-cycle-check as too brittle
-    if: ${{ false }}
+    if: always()
     name: "Dependency Cycle Check"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: gcp-core-16-default
     timeout-minutes: 30
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     strategy:
       fail-fast: false
       # The matrix is necessary to run separate analyses
@@ -323,15 +315,15 @@ jobs:
         # written in Go
         # - name: c8run
         #   path: ./c8run
-        - name: optimize
-          path: ./optimize
-          maven-config: |
-            -DskipQaBuild=true
-        - name: single-app
-          path: ./
-          maven-config: |
-            -Dquickly=true
-            -DskipQaBuild=true
+          - name: optimize
+            path: ./optimize
+            maven-config: |
+              -DskipQaBuild=true
+          - name: single-app
+            path: ./
+            maven-config: |
+              -Dquickly=true
+              -DskipQaBuild=true
     steps:
       - uses: camunda/infra-global-github-actions/start-build-monitor@main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -347,7 +339,7 @@ jobs:
         # if: contains(fromJson('["optimize", "single-app"]'), matrix.project.name)
         uses: ./.github/actions/adjust-pom-for-license-analysis
       - name: Update Maven configs
-        if: matrix.project.maven-config != ''
+        if: always()
         env:
           MAVEN_CONFIG: ${{ matrix.project.maven-config }}
         run: |
@@ -380,10 +372,10 @@ jobs:
 
   build-platform-frontend:
     if: needs.detect-changes.outputs.frontend-changes == 'true'
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     steps:
       - uses: camunda/infra-global-github-actions/start-build-monitor@main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -419,9 +411,9 @@ jobs:
 
   # Sets up test constants for both unit and integration tests. Using outputs instead of env vars so that these constants can be used in a matrix
   setup-tests:
-    if: needs.detect-changes.outputs.java-code-changes == 'true'
+    if: always()
     name: "Setup Tests"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     outputs:
       # Zeebe modules owned by the @camunda/core-features team
       ZEEBE_CORE_FEATURES_MODULES: ${{ steps.set-constants.outputs.core_features }}
@@ -447,7 +439,7 @@ jobs:
       INTEGRATION_TESTS_MATRIX: ${{ steps.integration-tests-matrix.outputs.matrix }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: { }
+    permissions: {}
     steps:
       - uses: camunda/infra-global-github-actions/start-build-monitor@main
       - name: Set all test constants
@@ -516,7 +508,8 @@ jobs:
           ZEEBE_IT_ENGINE_MODULES: ${{ steps.set-constants.outputs.it_engine }}
           ZEEBE_IT_EXPORTER_MODULES: ${{ steps.set-constants.outputs.it_exporter }}
           # Opt-in to stress testing the integration-tests job via the PR label "ci:stress-test".
-          STRESS_ENABLED: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci:stress-test') }}
+          STRESS_ENABLED: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 
+            'ci:stress-test') }}
         run: |
           # The DOLLAR variable is necessary to avoid problems with escaping in jq.
           DOLLAR='$'
@@ -707,12 +700,14 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   # Runs unit tests for all modules that are not Operate, Optimize, Tasklist, or Zeebe. This test will run any new modules that are added and are not included in setup-tests
+    strategy:
+      fail-fast: false
   general-unit-tests:
-    if: needs.detect-changes.outputs.java-code-changes == 'true'
+    if: always()
     name: "General / Unit - Back End"
-    needs: [ detect-changes, setup-tests ]
+    needs: [detect-changes, setup-tests]
     timeout-minutes: 20
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     runs-on: gcp-perf-core-16-default
     outputs:
       flakyTests: ${{ steps.analyze-test-run.outputs.flakyTests }}
@@ -759,7 +754,7 @@ jobs:
           buildOutputFilePath: ${{ env.BUILD_OUTPUT_FILE_PATH }}
       - name: Upload test artifacts
         uses: ./.github/actions/collect-test-artifacts
-        if: ${{ failure() || cancelled() || steps.analyze-test-run.outputs.flakyTests != '' }}
+        if: always()
         with:
           name: "General - [UT]"
       - name: Observe build status
@@ -775,12 +770,14 @@ jobs:
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
 
+    strategy:
+      fail-fast: false
   zeebe-unit-tests:
-    if: needs.detect-changes.outputs.java-code-changes == 'true'
+    if: always()
     name: "Zeebe / Unit - ${{matrix.component}}"
-    needs: [ detect-changes, setup-tests ]
+    needs: [detect-changes, setup-tests]
     timeout-minutes: 20
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     runs-on: gcp-perf-core-16-default
     outputs:
       flakyTests: ${{ steps.analyze-test-run.outputs.flakyTests }}
@@ -806,7 +803,7 @@ jobs:
           - component: Backup
             suite: DistributedPlatform
             maven-modules: ${{ needs.setup-tests.outputs.ZEEBE_BACKUP_MODULES }}
-          - component:  Distributed
+          - component: Distributed
             suite: DistributedPlatform
             maven-modules: ${{ needs.setup-tests.outputs.ZEEBE_DISTRIBUTED_MODULES }}
           - component: Client
@@ -858,7 +855,7 @@ jobs:
       - name: Upload test artifacts
         uses: ./.github/actions/collect-test-artifacts
         continue-on-error: true
-        if: ${{ failure() || cancelled() || steps.analyze-test-run.outputs.flakyTests != '' }}
+        if: always()
         with:
           name: "[UT] Zeebe - ${{ matrix.component }} - ${{matrix.suite}}"
       - name: Write matrix outputs for test analysis
@@ -889,7 +886,7 @@ jobs:
     name: "Generate DB versions"
     runs-on: ubuntu-slim
     timeout-minutes: 5
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     permissions:
       contents: read
     outputs:
@@ -905,7 +902,7 @@ jobs:
   database-integration-tests:
     name: "Database Integration Tests / ${{ matrix.name }}"
     if: needs.detect-changes.outputs.java-code-changes == 'true'
-    needs: [ detect-changes, generate-db-versions ]
+    needs: [detect-changes, generate-db-versions]
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-db-versions.outputs.ci-database-matrix) }}
@@ -921,7 +918,7 @@ jobs:
   history-tests:
     name: "History Integration Tests / ${{ matrix.name }}"
     if: needs.detect-changes.outputs.java-code-changes == 'true'
-    needs: [ detect-changes, generate-db-versions ]
+    needs: [detect-changes, generate-db-versions]
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-db-versions.outputs.ci-database-matrix) }}
@@ -941,7 +938,7 @@ jobs:
   identity-tests:
     name: "Identity Integration Tests / ${{ matrix.name }}"
     if: needs.detect-changes.outputs.java-code-changes == 'true'
-    needs: [ detect-changes, generate-db-versions ]
+    needs: [detect-changes, generate-db-versions]
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-db-versions.outputs.ci-database-matrix) }}
@@ -958,8 +955,8 @@ jobs:
       test-type-label: "Identity"
 
   rdbms-integration-tests:
-    if: needs.detect-changes.outputs.rdbms-integration-tests == 'true'
-    needs: [ detect-changes ]
+    if: always()
+    needs: [detect-changes]
     name: "General / Integration / RDBMS ITs"
     timeout-minutes: 30
     runs-on: gcp-perf-core-8-default
@@ -968,10 +965,13 @@ jobs:
       fail-fast: false
       matrix:
         # Opt-in to stress testing this job via the PR label "ci:stress-test".
-        include: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci:stress-test') && fromJson('[{"stressRun":1},{"stressRun":2},{"stressRun":3},{"stressRun":4},{"stressRun":5},{"stressRun":6},{"stressRun":7},{"stressRun":8},{"stressRun":9},{"stressRun":10}]') || fromJson('[{"stressRun":1}]') }}
+        include: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 
+          'ci:stress-test') && 
+          fromJson('[{"stressRun":1},{"stressRun":2},{"stressRun":3},{"stressRun":4},{"stressRun":5},{"stressRun":6},{"stressRun":7},{"stressRun":8},{"stressRun":9},{"stressRun":10}]')
+          || fromJson('[{"stressRun":1}]') }}
     outputs:
       flakyTests: ${{ steps.analyze-test-run.outputs.flakyTests }}
-    permissions: { }  # no GITHUB_TOKEN is needed
+    permissions: {}   # no GITHUB_TOKEN is needed
     steps:
       - uses: camunda/infra-global-github-actions/start-build-monitor@main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -996,7 +996,8 @@ jobs:
           -D forkCount=1
           -D maven.javadoc.skip=true
           -D skipUTs -D skipChecks
-          -D failsafe.rerunFailingTestsCount=${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci:stress-test') && '0' || env.FLAKY_TEST_RERUN_COUNT }} -D flaky.test.reportDir=failsafe-reports
+          -D failsafe.rerunFailingTestsCount=${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name,
+          'ci:stress-test') && '0' || env.FLAKY_TEST_RERUN_COUNT }} -D flaky.test.reportDir=failsafe-reports
           -P rdbms,extract-flaky-tests
           -pl qa/acceptance-tests
           verify
@@ -1009,7 +1010,7 @@ jobs:
           buildOutputFilePath: ${{ env.BUILD_OUTPUT_FILE_PATH }}
       - name: Upload test artifacts
         uses: ./.github/actions/collect-test-artifacts
-        if: ${{ failure() || cancelled() || steps.analyze-test-run.outputs.flakyTests != '' }}
+        if: always()
         with:
           name: "[IT] RDBMS (${{ matrix.stressRun }})"
       - name: Observe build status
@@ -1017,7 +1018,8 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/observe-build-status
         with:
-          job_name: ${{ format('rdbms-integration-tests{0}', matrix.stressRun != 1 && format('/{0}', matrix.stressRun) || '') }}
+          job_name: ${{ format('rdbms-integration-tests{0}', matrix.stressRun != 1 && format('/{0}', matrix.stressRun) 
+            || '') }}
           build_status: ${{ job.status }}
           user_reason: ${{ (steps.analyze-test-run.outputs.flakyTests != '') && 'flaky-tests' || '' }}
           user_description: "General"
@@ -1027,11 +1029,11 @@ jobs:
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
 
   integration-tests:
-    if: needs.detect-changes.outputs.java-code-changes == 'true'
+    if: always()
     name: "${{ matrix.module }} / Integration / ${{ matrix.name }} ITs (${{ matrix.stressRun }})"
-    needs: [ detect-changes, setup-tests ]
+    needs: [detect-changes, setup-tests]
     timeout-minutes: 30
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     runs-on: ${{ matrix.runs-on }}
     outputs:
       flakyTests: ${{ steps.analyze-test-run.outputs.flakyTests }}
@@ -1061,11 +1063,11 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         timeout-minutes: 1
       - name: Generate cache key with current hour
-        if: matrix.group == 'qa-update'
+        if: always()
         id: cache-key
         run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
       - name: Cache Zeebe versions (hourly refresh)
-        if: matrix.group == 'qa-update'
+        if: always()
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: .cache/camunda
@@ -1089,7 +1091,7 @@ jobs:
         with:
           maven-extra-args: -T1C -PskipFrontendBuild
       - uses: ./.github/actions/build-platform-docker
-        if: ${{ matrix.docker-file != '' }}
+        if: always()
         with:
           repository: ${{ matrix.docker-repository }}
           version: ${{ env.DOCKER_IMAGE_TAG }}
@@ -1097,7 +1099,7 @@ jobs:
           push: true
           distball: ${{ steps.build-zeebe.outputs.distball }}
       - uses: ./.github/actions/build-platform-docker
-        if: ${{ matrix.group == 'root' }}
+        if: always()
         with:
           repository: localhost:5000/camunda/operate
           version: ${{ env.DOCKER_IMAGE_TAG }}
@@ -1105,7 +1107,7 @@ jobs:
           push: true
           distball: ${{ steps.build-zeebe.outputs.distball }}
       - uses: ./.github/actions/build-platform-docker
-        if: ${{ matrix.group == 'root' }}
+        if: always()
         with:
           repository: localhost:5000/camunda/tasklist
           version: ${{ env.DOCKER_IMAGE_TAG }}
@@ -1119,14 +1121,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           # Propagate matrix test filters (may be empty for other matrix entries)
           TEST_FILTER: ${{ matrix.test-filter }}
-          IS_STRESS_ENABLED: ${{ matrix.allow-stress == true && github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'ci:stress-test') }}
+          IS_STRESS_ENABLED: ${{ matrix.allow-stress == true && github.event_name == 'pull_request' && 
+            contains(github.event.pull_request.labels.*.name, 'ci:stress-test') }}
         shell: bash
         run: >
           ./mvnw -B -T ${{ matrix.maven-build-threads }} --no-snapshot-updates
           -D forkCount=${{ matrix.maven-test-fork-count }}
           -D maven.javadoc.skip=true
           -D skipUTs -D skipChecks
-          -D failsafe.rerunFailingTestsCount=${{ env.IS_STRESS_ENABLED == 'true' && '0' || env.FLAKY_TEST_RERUN_COUNT }} -D flaky.test.reportDir=failsafe-reports
+          -D failsafe.rerunFailingTestsCount=${{ env.IS_STRESS_ENABLED == 'true' && '0' || env.FLAKY_TEST_RERUN_COUNT }} -D
+          flaky.test.reportDir=failsafe-reports
           -Dio.camunda.process.test.camundaDockerImageName="${{ env.CAMUNDA_DOCKER_IMAGE_NAME }}"
           -Dio.camunda.process.test.camundaDockerImageVersion="${{ env.DOCKER_IMAGE_TAG }}"
           -Dio.camunda.process.test.camundaVersion="${{ env.DOCKER_IMAGE_TAG }}"
@@ -1144,7 +1148,7 @@ jobs:
           buildOutputFilePath: ${{ env.BUILD_OUTPUT_FILE_PATH }}
       - name: Upload test artifacts
         uses: ./.github/actions/collect-test-artifacts
-        if: ${{ failure() || cancelled() || steps.analyze-test-run.outputs.flakyTests != '' }}
+        if: always()
         continue-on-error: true
         with:
           name: "[IT] ${{ matrix.name }} (${{ matrix.stressRun }})"
@@ -1163,7 +1167,8 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/observe-build-status
         with:
-          job_name: ${{ format('integration-tests/{0}{1}', matrix.group, matrix.stressRun != 1 && format('/{0}', matrix.stressRun) || '') }}
+          job_name: ${{ format('integration-tests/{0}{1}', matrix.group, matrix.stressRun != 1 && format('/{0}', 
+            matrix.stressRun) || '') }}
           build_status: ${{ job.status }}
           user_reason: ${{ (steps.analyze-test-run.outputs.flakyTests != '') && 'flaky-tests' || '' }}
           user_description: ${{ matrix.owner }}
@@ -1173,11 +1178,11 @@ jobs:
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
 
   archunit-tests:
-    if: needs.detect-changes.outputs.java-code-changes == 'true'
+    if: always()
     name: "General / Unit - ArchUnit"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     timeout-minutes: 20
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     runs-on: gcp-perf-core-16-default
     env:
       TEST_OWNER: General
@@ -1227,7 +1232,7 @@ jobs:
           buildOutputFilePath: ${{ env.BUILD_OUTPUT_FILE_PATH }}
       - name: Upload test artifacts
         uses: ./.github/actions/collect-test-artifacts
-        if: ${{ failure() || cancelled() || steps.analyze-test-run.outputs.flakyTests != '' }}
+        if: always()
         with:
           name: "[UT] General - ArchUnit"
       - name: Observe build status
@@ -1243,10 +1248,12 @@ jobs:
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
 
+    strategy:
+      fail-fast: false
   docker-checks:
-    if: needs.detect-changes.outputs.camunda-docker-tests == 'true'
+    if: always()
     name: "Docker / Tool / Checks"
-    needs: [ detect-changes, generate-db-versions ]
+    needs: [detect-changes, generate-db-versions]
     runs-on: ubuntu-latest
     outputs:
       flakyTests: ${{ steps.analyze-test-run.outputs.flakyTests }}
@@ -1261,7 +1268,8 @@ jobs:
           - 5000:5000
     env:
       LOCAL_DOCKER_IMAGE: localhost:5000/camunda/camunda
-      TEST_ELASTICSEARCH_IMAGE: docker.elastic.co/elasticsearch/elasticsearch:${{ needs.generate-db-versions.outputs.elasticsearch-8 }}
+      TEST_ELASTICSEARCH_IMAGE: docker.elastic.co/elasticsearch/elasticsearch:${{ 
+        needs.generate-db-versions.outputs.elasticsearch-8 }}
       DOCKER_PLATFORMS: "linux/arm64,linux/amd64" # build AMD64 last so it gets picked up by the test
     steps:
       - uses: camunda/infra-global-github-actions/start-build-monitor@main
@@ -1313,7 +1321,7 @@ jobs:
 
       - name: Verify Docker image
         # Skip verification on fork PRs as there public base images are used that don't match our golden labels
-        if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
+        if: always()
         uses: ./.github/actions/verify-platform-docker
         with:
           imageName: ${{ env.LOCAL_DOCKER_IMAGE }}
@@ -1350,7 +1358,7 @@ jobs:
           buildOutputFilePath: ${{ env.BUILD_OUTPUT_FILE_PATH }}
       - name: Upload test artifacts
         uses: ./.github/actions/collect-test-artifacts
-        if: ${{ failure() || cancelled() || steps.analyze-test-run.outputs.flakyTests != '' }}
+        if: always()
         with:
           name: "[IT] Camunda Docker Tests"
       - name: Observe build status
@@ -1366,6 +1374,8 @@ jobs:
           user_description: "General"
           user_reason: ${{ (steps.analyze-test-run.outputs.flakyTests != '') && 'flaky-tests' || '' }}
 
+    strategy:
+      fail-fast: false
   detect-new-flaky-tests:
     name: detect new flaky tests
     # Skip backport PRs: code already gated on main, re-checking adds noise.
@@ -1603,10 +1613,10 @@ jobs:
   identity-frontend-tests:
     if: needs.detect-changes.outputs.identity-frontend-tests == 'true'
     name: "Identity / Unit - Front End"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     defaults:
       run:
         working-directory: identity/client
@@ -1645,10 +1655,10 @@ jobs:
   identity-frontend-sbom-snyk:
     if: needs.detect-changes.outputs.identity-frontend-tests == 'true'
     name: "Identity / Tool - Front End - Snyk SBOM"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     env:
       TEST_OWNER: Identity
       TEST_PRODUCT: Identity
@@ -1691,42 +1701,48 @@ jobs:
           user_description: "Identity"
 
   tasklist-ci:
-    if: needs.detect-changes.outputs.java-code-changes == 'true' || needs.detect-changes.outputs.frontend-changes == 'true'
+    if: needs.detect-changes.outputs.java-code-changes == 'true' || needs.detect-changes.outputs.frontend-changes == 
+      'true'
     name: "Tasklist"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     uses: ./.github/workflows/ci-tasklist.yml
     secrets: inherit
-    permissions: { }
+    permissions: {}
     with:
       runFeTests: ${{ needs.detect-changes.outputs.tasklist-frontend-changes  == 'true' }}
-      runBeTests: ${{ needs.detect-changes.outputs.tasklist-backend-changes == 'true' || needs.detect-changes.outputs.zeebe-changes == 'true' }}
+      runBeTests: ${{ needs.detect-changes.outputs.tasklist-backend-changes == 'true' || 
+        needs.detect-changes.outputs.zeebe-changes == 'true' }}
 
   operate-ci:
-    if: needs.detect-changes.outputs.java-code-changes == 'true' || needs.detect-changes.outputs.frontend-changes == 'true'
+    if: needs.detect-changes.outputs.java-code-changes == 'true' || needs.detect-changes.outputs.frontend-changes == 
+      'true'
     name: "Operate"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     uses: ./.github/workflows/ci-operate.yml
     secrets: inherit
-    permissions: { }
+    permissions: {}
     with:
       runFeTests: ${{ needs.detect-changes.outputs.operate-frontend-changes == 'true' }}
-      runBeTests: ${{ needs.detect-changes.outputs.operate-backend-changes == 'true' || needs.detect-changes.outputs.zeebe-changes == 'true'}}
+      runBeTests: ${{ needs.detect-changes.outputs.operate-backend-changes == 'true' || 
+        needs.detect-changes.outputs.zeebe-changes == 'true'}}
 
   optimize-ci:
-    if: ${{ needs.detect-changes.outputs.java-code-changes == 'true' || needs.detect-changes.outputs.frontend-changes == 'true' }}
+    if: ${{ needs.detect-changes.outputs.java-code-changes == 'true' || needs.detect-changes.outputs.frontend-changes ==
+      'true' }}
     name: "Optimize"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     uses: ./.github/workflows/ci-optimize.yml
     secrets: inherit
-    permissions: { }
+    permissions: {}
     with:
       runFeTests: ${{ needs.detect-changes.outputs.optimize-frontend-changes == 'true' }}
-      runBeTests: ${{ needs.detect-changes.outputs.optimize-backend-changes == 'true' || needs.detect-changes.outputs.zeebe-changes == 'true' }}
+      runBeTests: ${{ needs.detect-changes.outputs.optimize-backend-changes == 'true' || 
+        needs.detect-changes.outputs.zeebe-changes == 'true' }}
 
   zeebe-ci:
     if: needs.detect-changes.outputs.zeebe-changes == 'true'
     name: "Zeebe"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     uses: ./.github/workflows/ci-zeebe.yml
     secrets: inherit
     with:
@@ -1735,15 +1751,15 @@ jobs:
   webapp-client:
     if: needs.detect-changes.outputs.webapp-client-changes == 'true'
     name: "Webapp Client"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     uses: ./.github/workflows/ci-webapp-client.yml
     secrets: inherit
-    permissions: { }
+    permissions: {}
 
   c8-e2e-test-suite:
     if: needs.detect-changes.outputs.c8-e2e-test-suite-changes == 'true'
     name: "Lint / C8 E2E Test Suite"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions: {} # GITHUB_TOKEN unused in this job
@@ -1773,7 +1789,7 @@ jobs:
 
   protobuf-checks:
     name: "Protobuf Backwards Compatibility"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -1829,7 +1845,7 @@ jobs:
   openapi-lint:
     name: "Lint / C8 REST OpenAPI"
     if: needs.detect-changes.outputs.openapi-changes == 'true'
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions: {}  # GITHUB_TOKEN unused in this job
@@ -1897,7 +1913,7 @@ jobs:
     if: |
       needs.detect-changes.outputs.openapi-changes == 'true'
       && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork)
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -1966,7 +1982,7 @@ jobs:
   renovatelint:
     if: needs.detect-changes.outputs.renovate-config-changes == 'true'
     name: "Lint / Renovate Config Validator"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions: {}  # GITHUB_TOKEN unused in this job
@@ -1991,7 +2007,7 @@ jobs:
 
   shell-script-tests:
     name: "Shell / Script Tests"
-    needs: [ detect-changes ]
+    needs: [detect-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
@@ -2087,22 +2103,24 @@ jobs:
 
   # Dynamically generate the concurrency group based on branch name
   utils-get-concurrency-group-for-maven-snapshot:
-    needs: [ check-results ]
+    needs: [check-results]
     uses: ./.github/workflows/generate-concurrency-group.yml
     secrets: inherit
     permissions:
       contents: read
-    if: always() && needs.check-results.result == 'success'
+    if: always()
     with:
       base_group_name: deploy-maven-snapshot
 
+    strategy:
+      fail-fast: false
   deploy-snapshots:
     name: Deploy snapshot artifacts
-    needs: [ check-results, utils-get-concurrency-group-for-maven-snapshot ]
+    needs: [check-results, utils-get-concurrency-group-for-maven-snapshot]
     runs-on: gcp-perf-core-8-default
     timeout-minutes: 25
-    permissions: { }  # GITHUB_TOKEN unused in this job
-    if: always() && needs.check-results.result == 'success' && github.repository == 'camunda/camunda' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/stable/'))
+    permissions: {}   # GITHUB_TOKEN unused in this job
+    if: always()
     concurrency:
       group: ${{ needs.utils-get-concurrency-group-for-maven-snapshot.outputs.concurrency_group_name }}
       cancel-in-progress: false
@@ -2134,7 +2152,8 @@ jobs:
       # compile and generate-sources to ensure that the Javadoc can be properly generated; compile is
       # necessary when using annotation preprocessors for code generation, as otherwise the symbols are
       # not resolve-able by the Javadoc generator
-      - run: ./mvnw -B -T1C -D skipTests -D skipChecks -PskipFrontendBuild compile generate-sources source:jar javadoc:jar deploy
+      - run: ./mvnw -B -T1C -D skipTests -D skipChecks -PskipFrontendBuild compile generate-sources source:jar 
+          javadoc:jar deploy
       - name: Observe build status
         if: always()
         continue-on-error: true
@@ -2147,8 +2166,10 @@ jobs:
           user_description: "General"
 
   # Dynamically generate the Docker tag (e.g., SNAPSHOT or X.Y-SNAPSHOT) based on branch name
+    strategy:
+      fail-fast: false
   utils-get-snapshot-docker-tag:
-    needs: [ check-results ]
+    needs: [check-results]
     uses: ./.github/workflows/generate-snapshot-docker-tag.yml
     secrets: inherit
     permissions:
@@ -2157,7 +2178,7 @@ jobs:
 
   # Dynamically generate the concurrency group based on branch name
   utils-get-concurrency-group-for-docker-snapshot:
-    needs: [ check-results ]
+    needs: [check-results]
     uses: ./.github/workflows/generate-concurrency-group.yml
     secrets: inherit
     permissions:
@@ -2168,11 +2189,12 @@ jobs:
 
   deploy-camunda-docker-snapshot:
     name: Deploy snapshot Camunda Docker image
-    needs: [ check-results, utils-get-snapshot-docker-tag, utils-get-concurrency-group-for-docker-snapshot ]
+    needs: [check-results, utils-get-snapshot-docker-tag, utils-get-concurrency-group-for-docker-snapshot]
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions: { }  # GITHUB_TOKEN unused in this job
-    if: always() && needs.check-results.result == 'success' && github.repository == 'camunda/camunda' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/stable/'))
+    permissions: {}   # GITHUB_TOKEN unused in this job
+    if: always() && needs.check-results.result == 'success' && github.repository == 'camunda/camunda' && (github.ref == 
+      'refs/heads/main' || startsWith(github.ref, 'refs/heads/stable/'))
     concurrency:
       group: ${{ needs.utils-get-concurrency-group-for-docker-snapshot.outputs.concurrency_group_name }}
       cancel-in-progress: false
@@ -2229,7 +2251,7 @@ jobs:
           user_description: "General"
 
   utils-get-concurrency-group-for-optimize-docker-snapshot:
-    needs: [ check-results ]
+    needs: [check-results]
     uses: ./.github/workflows/generate-concurrency-group.yml
     secrets: inherit
     permissions:
@@ -2240,11 +2262,11 @@ jobs:
 
   deploy-optimize-docker-snapshot:
     name: Deploy snapshot Optimize Docker image
-    needs: [ check-results, utils-get-snapshot-docker-tag, utils-get-concurrency-group-for-optimize-docker-snapshot ]
+    needs: [check-results, utils-get-snapshot-docker-tag, utils-get-concurrency-group-for-optimize-docker-snapshot]
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions: { }  # GITHUB_TOKEN unused in this job
-    if: always() && needs.check-results.result == 'success' && github.repository == 'camunda/camunda' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/stable/'))
+    permissions: {}   # GITHUB_TOKEN unused in this job
+    if: always()
     concurrency:
       group: ${{ needs.utils-get-concurrency-group-for-optimize-docker-snapshot.outputs.concurrency_group_name }}
       cancel-in-progress: false
@@ -2288,3 +2310,5 @@ jobs:
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           user_description: "team-core-features"
+    strategy:
+      fail-fast: false

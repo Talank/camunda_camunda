@@ -7,26 +7,6 @@ name: Tasklist CI
 
 on:
   workflow_dispatch:
-    inputs:
-      runFeTests:
-        description: "Set to true to run front end tests for Tasklist"
-        type: boolean
-        required: true
-      runBeTests:
-        description: "Set to true to run back end tests for Tasklist"
-        type: boolean
-        required: true
-  workflow_call:
-    inputs:
-      runFeTests:
-        description: "Set to true if Tasklist front-end code was changed"
-        type: boolean
-        required: true
-      runBeTests:
-        description: "Set to true if Tasklist back-end code was changed"
-        type: boolean
-        required: true
-
 defaults:
   run:
     # use bash shell by default to ensure pipefail behavior is the default
@@ -42,12 +22,12 @@ jobs:
   tasklist-backend-unit-tests:
     name: "Unit"
     uses: ./.github/workflows/ci-webapp-run-ut-reuseable.yml
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     secrets: inherit
     strategy:
       fail-fast: false
       matrix:
-        suite: [ DataLayer, CoreFeatures ]
+        suite: [DataLayer, CoreFeatures]
         include:
           - suite: DataLayer
             suiteName: Data Layer
@@ -465,7 +445,7 @@ jobs:
 #          secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
 
   integration-tests:
-    if: inputs.runBeTests
+    if: always()
     # Currently only runs Tasklist Docker tests but should be extended in future to also include backend tests
     name: "Integration / Docker ITs"
     runs-on: gcp-core-4-default
@@ -521,7 +501,7 @@ jobs:
             -Dtasklist.currentVersion.docker.repo=${{ env.TASKLIST_TEST_DOCKER_IMAGE }} \
             test
       - name: Upload Test Report
-        if: failure()
+        if: always()
         uses: ./.github/actions/collect-test-artifacts
         with:
           name: "tasklist docker tests"
@@ -535,3 +515,5 @@ jobs:
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           user_description: "team-core-features"
+    strategy:
+      fail-fast: false

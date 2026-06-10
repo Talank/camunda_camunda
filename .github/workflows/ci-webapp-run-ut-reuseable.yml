@@ -1,26 +1,7 @@
-# description: This is a reuseable workflow used to run Unit tests for Optimize, Tasklist, and Operate. Uses Junit5 Suite to determine which set of tests to run
-# test location: Optimize, Tasklist, Operate
-# type: CI
-# owner: @camunda/core-features
----
 name: Webapp Run Unit Tests Reusable
 
 on:
-  workflow_call:
-    inputs:
-      componentName:
-        description: "The name of the component under test"
-        required: true
-        type: string
-      suite:
-        description: "The suite under test. ie, DataLayer or CoreFeatures"
-        required: true
-        type: string
-      suiteName:
-        description: "Well formatted name of the suite under test. ie, 'Data Layer' or 'Core Features'"
-        required: true
-        type: string
-
+  workflow_dispatch:
 env:
   GHA_BEST_PRACTICES_LINTER: enabled
   TEST_OWNER: Core Features
@@ -33,14 +14,14 @@ defaults:
     # see https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#exit-codes-and-error-action-preference
     shell: bash
 
-permissions: { }
+permissions: {}
 
 jobs:
   build:
     name: "Unit - Back End - ${{ inputs.suiteName}}"
     runs-on: gcp-perf-core-8-default
     timeout-minutes: 10
-    permissions: { }
+    permissions: {}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Print metadata
@@ -78,7 +59,7 @@ jobs:
           buildOutputFilePath: ${{ env.BUILD_OUTPUT_FILE_PATH }}
       - name: Upload test artifacts
         uses: ./.github/actions/collect-test-artifacts
-        if: ${{ failure() || cancelled() || steps.analyze-test-run.outputs.flakyTests != '' }}
+        if: always()
         with:
           name: "[UT] ${{inputs.componentName}} - ${{inputs.suite}}"
       - name: Observe build status
@@ -94,3 +75,5 @@ jobs:
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
+    strategy:
+      fail-fast: false

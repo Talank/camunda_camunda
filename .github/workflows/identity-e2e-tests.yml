@@ -1,15 +1,8 @@
-# description: DISABLED - Workflow for end to end tests for Identity only. Tests will use a running instance of Identity for the API
-#              These tests are flaky and block PRs. They continue to run nightly via c8-orchestration-cluster-nightly-*-e2e.yml workflows.
-#              New smoke tests will be introduced as part of the FE Unification epic.
-# test location: /qa/c8-orchestration-cluster-e2e-test-suite/tests/identity
-# type: CI
-# owner: @camunda/identity
----
 name: Identity E2E Tests
 on:
   # Temporarily disabled - tests run nightly instead
   # See: https://github.com/camunda/camunda/issues/50125
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 # Limit workflow to 1 concurrent run per ref (branch): new commit -> old runs are canceled to save costs
 # Exception for main branch: complete builds for every commit needed for confidenence
@@ -34,7 +27,7 @@ jobs:
         uses: ./.github/actions/read-db-versions
 
   test:
-    needs: [ read-versions ]
+    needs: [read-versions]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -73,7 +66,8 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: ./qa/c8-orchestration-cluster-e2e-test-suite
       - name: Build backend
-        run: ./mvnw clean install -DskipTests=true -DskipChecks -Dskip.fe.build=true -T1C -B -DskipRemoteStaging=true -Dmaven.deploy.skip=true
+        run: ./mvnw clean install -DskipTests=true -DskipChecks -Dskip.fe.build=true -T1C -B -DskipRemoteStaging=true 
+          -Dmaven.deploy.skip=true
       - name: Start Identity
         run: >
           ./mvnw -q -B spring-boot:start -pl dist
@@ -141,3 +135,5 @@ jobs:
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
+    strategy:
+      fail-fast: false

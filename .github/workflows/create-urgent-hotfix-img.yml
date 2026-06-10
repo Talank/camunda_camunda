@@ -23,24 +23,6 @@ name: Create Urgent Hotfix Image
 
 on:
   workflow_dispatch:
-    inputs:
-      branch:
-        description: 'The branch to create hotfix images from (ignored if commit is specified)'
-        required: false
-        type: string
-      commit:
-        description: 'The specific commit SHA to create hotfix images from (must be full 40-character SHA - takes precedence over branch)'
-        required: false
-        type: string
-      support-ticket-id:
-        description: 'The support ticket ID (e.g. SUPPORT-12345, JIRA-123, ticket-456)'
-        required: true
-        type: string
-      components_with_versions:
-        description: 'Components to build with versions (e.g. camunda:8.6.1,operate:8.6.1)'
-        required: true
-        type: string
-
 defaults:
   run:
     shell: bash
@@ -173,7 +155,8 @@ jobs:
           vault-address: ${{ secrets.VAULT_ADDR }}
           vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
           vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
-          maven-mirrors: '[{"id": "camunda-nexus", "name": "Camunda Nexus", "url": "https://repository.nexus.camunda.cloud/content/groups/internal/", "mirrorOf": "*"}]'
+          maven-mirrors: '[{"id": "camunda-nexus", "name": "Camunda Nexus", "url": "https://repository.nexus.camunda.cloud/content/groups/internal/",
+            "mirrorOf": "*"}]'
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
 
@@ -302,7 +285,8 @@ jobs:
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: ./build-repo
-          file: ./build-repo/${{ matrix.component == 'zeebe' && 'Dockerfile' || format('{0}.Dockerfile', matrix.component) }}
+          file: ./build-repo/${{ matrix.component == 'zeebe' && 'Dockerfile' || format('{0}.Dockerfile', 
+            matrix.component) }}
           platforms: ${{ env.PLATFORMS }}
           push: true
           provenance: false
