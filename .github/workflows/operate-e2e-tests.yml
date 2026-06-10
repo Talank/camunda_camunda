@@ -8,7 +8,7 @@ name: "[Legacy] Operate / E2E Tests"
 on:
   # Temporarily disabled - tests run nightly instead
   # See: https://github.com/camunda/camunda/issues/50125
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 # Limit workflow to 1 concurrent run per ref (branch): new commit -> old runs are canceled to save costs
 # Exception for main branch: complete builds for every commit needed for confidenence
@@ -31,7 +31,7 @@ jobs:
 
   test:
     needs: [read-versions]
-    runs-on: gcp-core-4-default
+    runs-on: ${{ matrix.os }}
     services:
       elasticsearch:
         image: docker.elastic.co/elasticsearch/elasticsearch:${{ needs.read-versions.outputs.elasticsearch-8 }}
@@ -99,11 +99,13 @@ jobs:
               "username": "${{ steps.secrets.outputs.NEXUS_USR }}",
               "password": "${{ steps.secrets.outputs.NEXUS_PSW }}"
             }]
-          mirrors: '[{"url": "https://repository.nexus.camunda.cloud/content/groups/internal/", "id": "camunda-nexus", "mirrorOf": "*", "name": "camunda Nexus"}]'
+          mirrors: '[{"url": "https://repository.nexus.camunda.cloud/content/groups/internal/", "id": "camunda-nexus", "mirrorOf":
+            "*", "name": "camunda Nexus"}]'
       - name: Build backend
         # Currently, the e2e environment of operate conflicts with the optimize build. For the moment,
         # we're excluding optimize from the build, not to impact this Operate workflow.
-        run: ./mvnw clean install -T1C -DskipChecks -P -docker,skipFrontendBuild -DskipTests=true -B -DskipRemoteStaging=true -Dmaven.deploy.skip=true
+        run: ./mvnw clean install -T1C -DskipChecks -P -docker,skipFrontendBuild -DskipTests=true -B 
+          -DskipRemoteStaging=true -Dmaven.deploy.skip=true
       - name: Start Operate
         run: |
           DIST_DIR="$(find dist/target -maxdepth 1 -type d -name 'camunda-zeebe*' | head -n 1)"
@@ -174,22 +176,22 @@ jobs:
           retention-days: 30
 
       - name: Collect docker logs on failure
-        if: failure()
+        if: always()
         uses: jwalton/gh-docker-logs@2741064ab9d7af54b0b1ffb6076cf64c16f0220e # v2.2.2
         with:
           dest: "./logs"
       - name: Tar logs
-        if: failure()
+        if: always()
         run: tar cvzf ./logs.tgz ./logs
       - name: Upload logs to GitHub
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: logs.tgz
           path: ./logs.tgz
 
       - name: Show Operate logs on failure
-        if: failure()
+        if: always()
         run: |
           echo "=== Camunda logs ==="
           cat "$RUNNER_TEMP/operate.log"
@@ -210,3 +212,10 @@ jobs:
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+      fail-fast: false

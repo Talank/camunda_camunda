@@ -7,26 +7,6 @@ name: Operate CI
 
 on:
   workflow_dispatch:
-    inputs:
-      runFeTests:
-        description: "Set to true if Operate front-end code was changed"
-        type: boolean
-        required: true
-      runBeTests:
-        description: "Set to true if Operate back-end code was changed"
-        type: boolean
-        required: true
-  workflow_call:
-    inputs:
-      runFeTests:
-        description: "Set to true if Operate front-end code was changed"
-        type: boolean
-        required: true
-      runBeTests:
-        description: "Set to true if Operate back-end code was changed"
-        type: boolean
-        required: true
-
 defaults:
   run:
     # use bash shell by default to ensure pipefail behavior is the default
@@ -60,9 +40,9 @@ jobs:
 
   # Checks to see if Operate can properly build itself and a docker image
   build-operate-backend:
-    if: inputs.runBeTests
+    if: always()
     name: "Build Back End"
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     permissions: {} # GITHUB_TOKEN unused in this job
     env:
@@ -105,6 +85,13 @@ jobs:
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           user_description: "team-core-features"
 
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+      fail-fast: false
   fe-unit-tests:
     if: inputs.runFeTests
     name: "Unit - Front End [${{ matrix.shardIndex }}/${{ matrix.shardTotal }}]"
@@ -132,7 +119,8 @@ jobs:
           node-version: 24
       - run: npm ci
         name: Install dependencies
-      - run: npm run test -- --no-file-parallelism --maxWorkers 1 --reporter=blob --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
+      - run: npm run test -- --no-file-parallelism --maxWorkers 1 --reporter=blob --shard=${{ matrix.shardIndex }}/${{ 
+          matrix.shardTotal }}
         name: Unit & Integration tests
         env:
           NODE_OPTIONS: --max-old-space-size=8192

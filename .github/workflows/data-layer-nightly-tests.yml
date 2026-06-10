@@ -4,12 +4,7 @@
 name: Data Layer Nightly Tests
 
 on:
-  schedule:
-    # Run at 02:00 every night
-    - cron: '0 2 * * *'
   workflow_dispatch:
-  pull_request:
-    types: [labeled, synchronize]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -22,14 +17,14 @@ jobs:
       fail-fast: false
       matrix:
         branch: [stable/8.9, main]
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
     # Run on schedule, manual dispatch, or PR with 'run-dl-nightly-tests' label
-    if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' &&
-       (github.event.action == 'labeled' && github.event.label.name == 'run-dl-nightly-tests' ||
-        github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'run-dl-nightly-tests')))
-    runs-on: gcp-perf-core-8-default
+    if: |-
+      always()
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     permissions:
       contents: read
@@ -79,7 +74,8 @@ jobs:
               "username": "${{ steps.secrets.outputs.NEXUS_USR }}",
               "password": "${{ steps.secrets.outputs.NEXUS_PSW }}"
             }]
-          mirrors: '[{"url": "https://repository.nexus.camunda.cloud/content/groups/internal/", "id": "camunda-nexus", "mirrorOf": "*", "name": "camunda Nexus"}]'
+          mirrors: '[{"url": "https://repository.nexus.camunda.cloud/content/groups/internal/", "id": "camunda-nexus", "mirrorOf":
+            "*", "name": "camunda Nexus"}]'
 
       - uses: ./.github/actions/build-zeebe
         with:
@@ -103,7 +99,7 @@ jobs:
           verify
 
       - name: Upload test artifacts on failure
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: data-layer-nightly-test-failures-${{ matrix.branch }}

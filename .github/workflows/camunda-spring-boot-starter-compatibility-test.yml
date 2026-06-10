@@ -4,26 +4,7 @@
 name: Camunda Spring Boot Starter Compatibility Tests
 
 on:
-  schedule:
-    # Runs at 02:00 every day https://crontab.guru/#0_2_*_*_*
-    - cron: '0 2 * * *'
   workflow_dispatch:
-    inputs:
-      client_version:
-        description: 'Spring client version to test (e.g., 8.8.0 or 8.9-SNAPSHOT). Leave empty to test all versions.'
-        required: false
-        type: string
-      server_version:
-        description: 'Server version to test (e.g., 8.8.0 or 8.9-SNAPSHOT). Leave empty to test all versions.'
-        required: false
-        type: string
-      skip_cache:
-        description: 'Skip version cache and retest all combinations'
-        required: false
-        type: boolean
-        default: false
-    # To trigger manually
-
 permissions: {}
 
 defaults:
@@ -36,7 +17,7 @@ env:
 jobs:
   prepare-versions:
     name: Prepare Version Matrix
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     permissions:
       contents: read
@@ -217,7 +198,7 @@ jobs:
 
       - name: Restore tested combinations from previous run
         id: restore-tested
-        if: inputs.skip_cache != true
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -252,7 +233,7 @@ jobs:
 
       - name: Load tested combinations
         id: load-tested
-        if: inputs.skip_cache == true
+        if: always()
         run: |
           mkdir -p /tmp/compatibility-state
           touch /tmp/compatibility-state/tested-combinations.txt
@@ -342,18 +323,26 @@ jobs:
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
 
+    strategy:
+      matrix:
+        os: &id001
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+      fail-fast: false
   run-compatibility-tests:
     name: Test ${{ matrix.client }} -> ${{ matrix.server }}
     needs: prepare-versions
-    if: needs.prepare-versions.outputs.matrix != '' && needs.prepare-versions.outputs.matrix != '{"include":[]}'
-    runs-on: ubuntu-latest
+    if: always()
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     permissions:
       contents: read
       id-token: write
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.prepare-versions.outputs.matrix) }}
+      matrix:
+        os: *id001
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -398,13 +387,13 @@ jobs:
             -DfailIfNoTests=false
 
       - name: Record tested combination
-        if: success() && !contains(matrix.client, 'SNAPSHOT') && !contains(matrix.server, 'SNAPSHOT')
+        if: always()
         run: |
           mkdir -p compatibility-test-results
           echo "${{ matrix.client }}-${{ matrix.server }}" >> compatibility-test-results/tested.txt
 
       - name: Upload tested combinations
-        if: success() && !contains(matrix.client, 'SNAPSHOT') && !contains(matrix.server, 'SNAPSHOT')
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: spring-tested-combo-${{ matrix.client }}-${{ matrix.server }}
@@ -533,24 +522,24 @@ jobs:
           webhook: ${{ steps.secrets.outputs.SLACK_CAMUNDA_EX_CI_WEBHOOK }}
           webhook-type: incoming-webhook
           payload: |
-           {
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": ":alarm: *Camunda Spring Boot Starter Compatibility Tests Failed*"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "Branch: `${{ github.ref_name }}`\nPlease check: https://github.com/camunda/camunda/actions/runs/${{ github.run_id }}"
-                  }
-                }
-              ]
-            }
+            {
+               "blocks": [
+                 {
+                   "type": "section",
+                   "text": {
+                     "type": "mrkdwn",
+                     "text": ":alarm: *Camunda Spring Boot Starter Compatibility Tests Failed*"
+                   }
+                 },
+                 {
+                   "type": "section",
+                   "text": {
+                     "type": "mrkdwn",
+                     "text": "Branch: `${{ github.ref_name }}`\nPlease check: https://github.com/camunda/camunda/actions/runs/${{ github.run_id }}"
+                   }
+                 }
+               ]
+             }
 
       - name: Observe build status
         if: always()

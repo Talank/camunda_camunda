@@ -7,26 +7,6 @@ name: Optimize CI
 
 on:
   workflow_dispatch:
-    inputs:
-      runFeTests:
-        description: "Set to true if Optimize front-end code was changed"
-        type: boolean
-        required: true
-      runBeTests:
-        description: "Set to true if Optimize back-end code was changed"
-        type: boolean
-        required: true
-  workflow_call:
-    inputs:
-      runFeTests:
-        description: "Set to true if Optimize front-end code was changed"
-        type: boolean
-        required: true
-      runBeTests:
-        description: "Set to true if Optimize back-end code was changed"
-        type: boolean
-        required: true
-
 defaults:
   run:
     # use bash shell by default to ensure pipefail behavior is the default
@@ -42,12 +22,12 @@ jobs:
   optimize-backend-unit-tests:
     name: "Unit"
     uses: ./.github/workflows/ci-webapp-run-ut-reuseable.yml
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     secrets: inherit
     strategy:
       fail-fast: false
       matrix:
-        suite: [ DataLayer, CoreFeatures ]
+        suite: [DataLayer, CoreFeatures]
         include:
           - suite: DataLayer
             suiteName: Data Layer
@@ -60,21 +40,25 @@ jobs:
 
   optimize-it-elasticsearch:
     name: "Integration / Elasticsearch ITs"
-    if: inputs.runBeTests
-    runs-on: gcp-core-32-longrunning
+    if: always()
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     env:
       TEST_OWNER: Core Features
       TEST_TYPE: IT
     strategy:
       fail-fast: false
       matrix:
-        includedGroups: [ 'ccsm-test' ]
+        includedGroups: ['ccsm-test']
         include:
           - includedGroups: 'ccsm-test'
             excludedGroups: ''
             profiles: 'ccsm-it'
+        os: &id001
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -153,21 +137,22 @@ jobs:
 
   optimize-it-opensearch:
     name: "Integration / OpenSearch ITs"
-    if: inputs.runBeTests
-    runs-on: gcp-core-32-longrunning
+    if: always()
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     env:
       TEST_OWNER: Core Features
       TEST_TYPE: IT
     strategy:
       fail-fast: false
       matrix:
-        includedGroups: [ 'ccsm-test' ]
+        includedGroups: ['ccsm-test']
         include:
           - includedGroups: 'ccsm-test'
             excludedGroups: 'openSearchSingleTestFailOK'
             profiles: 'ccsm-it'
+        os: *id001
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -246,10 +231,10 @@ jobs:
 
   optimize-frontend-unit-tests:
     name: "Unit - Front End"
-    if: inputs.runFeTests
-    runs-on: ubuntu-latest
+    if: always()
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     defaults:
       run:
         working-directory: optimize/client
@@ -298,12 +283,16 @@ jobs:
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           user_description: "team-core-features"
 
+    strategy:
+      matrix:
+        os: *id001
+      fail-fast: false
   optimize-frontend-sbom-snyk:
     name: "Tool / Front End - Snyk SBOM"
-    if: inputs.runFeTests
-    runs-on: ubuntu-latest
+    if: always()
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     defaults:
       run:
         working-directory: optimize/client
@@ -355,11 +344,15 @@ jobs:
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           user_description: "team-core-features"
 
+    strategy:
+      matrix:
+        os: *id001
+      fail-fast: false
   hadolint:
     if: inputs.runBeTests
     name: "Tool / Dockerfile / Hadolint"
     runs-on: ubuntu-latest
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     timeout-minutes: 4
     env:
       TEST_OWNER: Core Features
@@ -367,10 +360,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dockerfile:
-          [
-            "optimize.Dockerfile",
-          ]
+        dockerfile: ["optimize.Dockerfile"]
     steps:
       - uses: camunda/infra-global-github-actions/start-build-monitor@main
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -393,10 +383,10 @@ jobs:
           user_description: "team-core-features"
   optimize-e2e-smoke:
     name: "E2E / Self-Managed (Smoke)"
-    if: inputs.runFeTests
-    runs-on: gcp-perf-core-8-default
+    if: always()
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
-    permissions: { }
+    permissions: {}
     env:
       TEST_TYPE: E2E
       TEST_OWNER: Core Features
@@ -552,12 +542,16 @@ jobs:
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           user_description: "team-core-features"
 
+    strategy:
+      matrix:
+        os: *id001
+      fail-fast: false
   e2e-cloud-test:
     name: "E2E Cloud"
-    if: inputs.runFeTests
-    runs-on: ubuntu-latest
+    if: always()
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    permissions: { }  # GITHUB_TOKEN unused in this job
+    permissions: {}   # GITHUB_TOKEN unused in this job
     env:
       TEST_OWNER: Core Features
       TEST_TYPE: E2E
@@ -666,3 +660,7 @@ jobs:
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           user_description: "team-core-features"
+    strategy:
+      matrix:
+        os: *id001
+      fail-fast: false

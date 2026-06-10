@@ -5,72 +5,6 @@ name: Zeebe Snyk
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: The project version; defaults to the version as defined by the root POM
-        required: false
-        type: string
-      target:
-        description: Allows overriding the project target reference directly; defaults to the current branch
-        required: false
-        type: string
-      dockerImage:
-        description: The full name of the Docker image; if absent and build is true, will use the built image name; if not building, infers from the version
-        required: false
-        type: string
-      monitor:
-        description: Upload Snyk snapshot instead of test
-        required: false
-        type: boolean
-        default: false
-      build:
-        description: Enable to also build Zeebe
-        required: false
-        type: boolean
-        default: true
-      useMinorVersion:
-        description: Uses the major and minor version only for target and version
-        required: false
-        type: boolean
-        default: false
-      ref:
-        description: The reference to checkout
-        required: false
-        type: string
-  workflow_call:
-    inputs:
-      version:
-        description: The project version; defaults to the version as defined by the root POM
-        required: false
-        type: string
-      target:
-        description: Allows overriding the project target reference directly; defaults to the current branch
-        required: false
-        type: string
-      dockerImage:
-        description: The full name of the Docker image; if absent and build is true, will use the built image name; if not building, infers from the version
-        required: false
-        type: string
-      monitor:
-        description: Upload Snyk snapshot instead of test
-        required: false
-        type: boolean
-        default: false
-      build:
-        description: Enable to also build Zeebe
-        required: false
-        type: boolean
-        default: true
-      useMinorVersion:
-        description: Uses the major and minor version only for target and version
-        required: false
-        type: boolean
-        default: false
-      ref:
-        description: The reference to checkout
-        required: false
-        type: string
-
 defaults:
   run:
     # use bash shell by default to ensure pipefail behavior is the default
@@ -82,7 +16,7 @@ jobs:
     name: Snyk Scan
     timeout-minutes: 15
     # Run on self-hosted to make building Zeebe much faster
-    runs-on: gcp-perf-core-8-default
+    runs-on: ${{ matrix.os }}
     permissions:
       security-events: write # required to upload SARIF files
     steps:
@@ -115,11 +49,11 @@ jobs:
         with:
           maven-extra-args: -PskipFrontendBuild
         id: build-zeebe
-        if: inputs.build
+        if: always()
       - name: Build Docker Image
         uses: ./.github/actions/build-platform-docker
         id: build-zeebe-docker
-        if: inputs.build
+        if: always()
         with:
           distball: ${{ steps.build-zeebe.outputs.distball }}
       # Prepares the bash environment for the step which will actually run Snyk, to avoid mixing too
@@ -237,7 +171,7 @@ jobs:
             exit 0
           fi
       - name: Code Scanning summary
-        if: ${{ ! inputs.monitor }}
+        if: always()
         run: |
           PR_NUMBER=$(echo "$GITHUB_REF" | awk 'BEGIN { FS = "/" } ; { print $3 }')
           export PR_NUMBER
@@ -254,3 +188,10 @@ jobs:
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+      fail-fast: false

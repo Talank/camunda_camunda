@@ -1,28 +1,14 @@
-# description: Reusable workflow — C8 Orchestration Cluster API Tests (RDBMS).
-#              Builds the Camunda distribution and runs API tests against the full
-#              RDBMS database matrix. Called by the per-version nightly API workflows
-#              for branches that support RDBMS (stable/8.9, main).
-# test location: /qa/c8-orchestration-cluster-e2e-test-suite
-# type: CI
-# owner: @camunda/test-automation-team
----
 name: C8 Orchestration Cluster - Reusable API Tests (RDBMS)
 
 on:
-  workflow_call:
-    inputs:
-      branch:
-        description: "Branch to test (e.g. stable/8.9, main)"
-        required: true
-        type: string
-
+  workflow_dispatch:
 permissions:
   contents: read
 
 jobs:
   nightly-build-rdbms-dist:
     name: "Build Camunda distribution (${{ inputs.branch }})"
-    runs-on: gcp-perf-core-16-default
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
     timeout-minutes: 30
@@ -67,10 +53,17 @@ jobs:
           path: dev-dist/
           retention-days: 1
 
+    strategy:
+      matrix:
+        os: &id001
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+      fail-fast: false
   nightly-api-tests-rdbms:
     name: API Tests (RDBMS) (${{ inputs.branch }} / ${{ matrix.database.database-name }})
     needs: nightly-build-rdbms-dist
-    runs-on: gcp-perf-core-16-default
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     permissions: {}
     strategy:
@@ -154,6 +147,7 @@ jobs:
             jdbc-url: "jdbc:oracle:thin:@localhost:1521/xepdb1"
             jdbc-username: "camunda"
             jdbc-password: "camunda"
+        os: *id001
     env:
       IMAGE_VERSION: ${{ matrix.database.database-image-version }}
     steps:
@@ -393,7 +387,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: json-report-nightly-api-rdbms-${{ steps.sanitize.outputs.safe_branch }}-${{ matrix.database.database-name }}
+          name: json-report-nightly-api-rdbms-${{ steps.sanitize.outputs.safe_branch }}-${{ 
+            matrix.database.database-name }}
           path: qa/c8-orchestration-cluster-e2e-test-suite/json-report/**
           retention-days: 60
 
@@ -402,7 +397,8 @@ jobs:
         continue-on-error: true
         uses: ./.github/actions/observe-build-status
         with:
-          job_name: "c8-orchestration-cluster-e2e-nightly-api-rdbms-tests/(${{ inputs.branch }} / ${{ matrix.database.database-name }})"
+          job_name: "c8-orchestration-cluster-e2e-nightly-api-rdbms-tests/(${{ inputs.branch }} / ${{ matrix.database.database-name
+            }})"
           build_status: ${{ job.status }}
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}

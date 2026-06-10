@@ -1,27 +1,6 @@
-# description: For C8Run, this workflow runs a linting check, unit tests, a build, tests on unix, and end to end tests on windows
-# type: CI
-# owner: @camunda/distribution
----
 name: "C8Run: build/test"
 
 on:
-  push:
-    branches:
-      - "main"
-      - "stable/**"
-      - "release/**"
-    paths:
-      - "c8run/**"
-      - ".github/actions/setup-c8run/action.yml"
-      - ".github/workflows/c8run-build.yaml"
-  pull_request:
-    paths:
-      - "c8run/**"
-      - ".github/actions/setup-c8run/action.yml"
-      - ".github/workflows/c8run-build.yaml"
-  schedule:
-    # Run at 23:30 UTC every day
-    - cron: "30 23 * * *"
   workflow_dispatch:
 
 env:
@@ -106,7 +85,7 @@ jobs:
 
   camunda-dist-build:
     name: Build camunda-dist
-    runs-on: gcp-perf-core-16-default
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -151,6 +130,13 @@ jobs:
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
 
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+      fail-fast: false
   test_c8run_on_unix:
     strategy:
       matrix:
