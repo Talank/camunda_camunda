@@ -7,14 +7,6 @@
 name: Maven Dependency Snapshot
 
 on:
-  push:
-    branches:
-      - main
-      - stable/**
-    paths:
-      - '**/pom.xml'
-      - 'bom/**'
-      - 'parent/**'
   workflow_dispatch:
 
 defaults:
@@ -24,7 +16,7 @@ defaults:
 jobs:
   submit-maven-snapshot:
     name: "Security / Submit Maven Dependency Snapshot"
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     permissions:
       contents: write  # required by the Dependency Submission API
@@ -54,3 +46,9 @@ jobs:
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+      fail-fast: false

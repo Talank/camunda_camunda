@@ -5,22 +5,6 @@ name: Camunda Process Test Compatibility Tests
 
 on:
   workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch to check out for CPT tests (e.g., stable/8.8)'
-        required: true
-        type: string
-      camunda_image_version:
-        description: 'Camunda Docker image version (e.g., 8.9-SNAPSHOT).'
-        required: false
-        default: 'SNAPSHOT'
-        type: string
-      connectors_image_version:
-        description: 'Connectors Docker image version (e.g., 8.9-SNAPSHOT).'
-        required: false
-        default: 'SNAPSHOT'
-        type: string
-
 permissions: {}
 
 defaults:
@@ -33,7 +17,7 @@ env:
 jobs:
   run-cpt-tests:
     name: Test CPT (${{ inputs.branch }}) -> Runtime ${{ inputs.camunda_image_version }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     permissions:
       contents: read
@@ -118,7 +102,8 @@ jobs:
         if: always()
         uses: ./.github/actions/collect-test-artifacts
         with:
-          name: 'cpt compatibility tests - cpt version ${{ steps.cpt-version.outputs.version }} camunda version ${{ inputs.camunda_image_version }}'
+          name: 'cpt compatibility tests - cpt version ${{ steps.cpt-version.outputs.version }} camunda version ${{ inputs.camunda_image_version
+            }}'
 
       - name: Observe build status
         if: always()
@@ -131,13 +116,19 @@ jobs:
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
 
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+      fail-fast: false
   notify-failure:
     name: Notify on failure
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [run-cpt-tests]
     if: always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
-    permissions: { }
+    permissions: {}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Import Secrets

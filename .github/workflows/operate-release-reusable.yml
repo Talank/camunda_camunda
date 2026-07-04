@@ -23,41 +23,37 @@
 name: Operate Release (reusable workflow)
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
       branch:
+        type: string
         description: "The branch name to build release from."
-        type: string
-        required: true
+        default: master
       releaseVersion:
+        type: string
         description: "Version to release (applied to pom.xml and Git tag)."
-        type: string
-        required: true
+        default: ''
       nextDevelopmentVersion:
-        description: "Next development version."
         type: string
-        required: true
+        description: "Next development version."
+        default: ''
       dryRun:
-        description: "Whether to perform a dry release, where no changes or artifacts(Docker, Maven) are pushed, defaults to `true`."
         type: boolean
-        required: false
+        description: "Whether to perform a dry release, where no changes or artifacts(Docker, Maven) are pushed, defaults
+          to `true`."
         default: true
       githubUploadRelease:
-        description: "Should upload the release to GitHub."
         type: boolean
-        required: false
+        description: "Should upload the release to GitHub."
         default: false
       isLatest:
-        description: "Should tag the docker image with 'latest' tag."
         type: boolean
-        required: false
+        description: "Should tag the docker image with 'latest' tag."
         default: false
       fromCommit:
-        description: "Commit id which the changelog should be generated from."
         type: string
-        required: false
+        description: "Commit id which the changelog should be generated from."
         default: ""
-
 defaults:
   run:
     # use bash shell by default to ensure pipefail behavior is the default
@@ -76,7 +72,7 @@ env:
 jobs:
   release:
     name: "'${{ inputs.branch }}' branch"
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
     steps:
       #########################################################################
       # Setup: checkout branch
@@ -146,7 +142,7 @@ jobs:
       # Pushing changes manually since maven-release-plugin fails in subfolders:
       # https://issues.apache.org/jira/browse/MRELEASE-885
       - name: Push Git changes
-        if: ${{ env.CREATE_A_RELEASE == 'true' }}
+        if: always()
         run: |
           git push --tags
           git push --all
@@ -160,7 +156,7 @@ jobs:
           -Darguments="-Dmaven.deploy.skip=$DRY_RUN -P -docker -DskipTests=true -DskipNexusStagingDeployMojo=$DRY_RUN -B --fail-at-end -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn -f pom.xml"
 
       - name: Create a GitHub release
-        if: ${{ env.CREATE_A_RELEASE == 'true' }}
+        if: always()
         env:
           GITHUB_TOKEN: ${{ steps.secrets.outputs.GITHUB_TOKEN }}
         uses: octokit/request-action@b91aabaa861c777dcdb14e2387e30eddf04619ae # v3.0.0
@@ -283,7 +279,7 @@ jobs:
       #########################################################################
       # Notify: send Slack notification of release failure
       - name: Send Slack notification on failure
-        if: failure()
+        if: always()
         uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
         with:
           webhook: ${{ steps.secrets.outputs.OPERATE_CI_ALERT_WEBHOOK_URL }}
@@ -296,3 +292,9 @@ jobs:
               "release_version": "${{ inputs.releaseVersion }}",
               "branch": "${{ inputs.branch }}"
             }
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+      fail-fast: false

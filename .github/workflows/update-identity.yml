@@ -4,31 +4,13 @@ name: Update Identity Version
 
 on:
   workflow_dispatch:
-    inputs:
-      identityVersion:
-        description: 'The identity version to update to, for example 8.3.11'
-        type: string
-        required: true
-      targetBranch:
-        description: 'The branch to update the identity version on, typically a release branch like release-8.3.15'
-        type: string
-        required: true
-      userSlackId:
-        description: 'The slack id of the user to notify on failure, no mention within the alert message if omitted'
-        type: string
-        required: false
-      dryRun:
-        description: 'Whether to perform a dry run where no changes pushed, defaults to true'
-        type: boolean
-        default: true
-
 env:
   GHA_BEST_PRACTICES_LINTER: enabled
 
 jobs:
   update-identity:
     name: "Update Identity version to ${{ inputs.identityVersion }}"
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     permissions:
       contents: write
@@ -47,7 +29,7 @@ jobs:
           xml-file: './parent/pom.xml'
           xpath: '//*[local-name()="version.identity"]'
       - uses: ./.github/actions/setup-build
-        if: ${{ steps.get-current-identity-version.outputs.info != inputs.identityVersion }}
+        if: always()
         with:
           maven-cache-key-modifier: identity-update
           vault-address: ${{ secrets.VAULT_ADDR }}
@@ -55,19 +37,19 @@ jobs:
           vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
       - name: Update identity version in ./parent/pom.xml
         id: update-identity-version
-        if: ${{ steps.get-current-identity-version.outputs.info != inputs.identityVersion }}
+        if: always()
         env:
           IDENTITY_VERSION: ${{ inputs.identityVersion }}
         run: |
           ./mvnw versions:set-property -DgenerateBackupPoms=false -Dproperty=version.identity -DnewVersion="$IDENTITY_VERSION" -pl parent
           git commit -am "deps(identity): update identity to $IDENTITY_VERSION"
       - name: Push Changes to the target branch
-        if: ${{ steps.update-identity-version.outcome == 'success' && inputs.dryRun == false }}
+        if: always()
         env:
           TARGET_BRANCH: ${{ inputs.targetBranch }}
         run: git push origin -- "$TARGET_BRANCH"
       - name: Import Camunda Secrets
-        if: success()
+        if: always()
         id: camunda-secrets
         uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
         with:
@@ -79,7 +61,7 @@ jobs:
           secrets: |
             secret/data/products/camunda/ci/monorepo-release CLIENT_CONFIG;
       - name: Notify Camunda of completion
-        if: success()
+        if: always()
         uses: camunda-community-hub/camunda-platform-8-github-action@9ceee922b16da4ac2b0d7b9e852b319b09382478
         with:
           clientConfig: ${{ steps.camunda-secrets.outputs.CLIENT_CONFIG }}
@@ -107,6 +89,12 @@ jobs:
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
 
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+      fail-fast: false
   notify:
     name: Send slack notification on failure
     runs-on: ubuntu-latest

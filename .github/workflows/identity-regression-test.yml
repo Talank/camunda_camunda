@@ -6,23 +6,6 @@ name: Identity API Regression Tests
 
 on:
   workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch to run tests on'
-        required: true
-        default: 'main'
-      multi-tenancy:
-        description: 'Enable MT?'
-        required: true
-        default: 'true'
-        type: choice
-        options: ['true', 'false']
-      authorizations:
-        description: 'Enable Authorizations?'
-        required: true
-        default: 'true'
-        type: choice
-        options: ['true', 'false']
 
 concurrency:
   cancel-in-progress: true
@@ -49,9 +32,9 @@ jobs:
 
   build-and-package:
     name: Build and Package Camunda
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: always()
 
     steps:
       - name: Checkout repository
@@ -78,9 +61,15 @@ jobs:
           path: dist/target/camunda-zeebe-*.tar.gz
           retention-days: 2
 
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+      fail-fast: false
   run-http-regression-tests:
     name: Run Regression Tests
-    needs: [ build-and-package, read-versions ]
+    needs: [build-and-package, read-versions]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     if: ${{ github.event_name == 'workflow_dispatch' }}

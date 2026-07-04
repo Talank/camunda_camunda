@@ -1,17 +1,7 @@
-# description: Runs End to End tests on the C8 Orchestration Cluster (ie, Tasklist, Operate) This workflow is run manually
-# type: CI
-# owner: @camunda/qa-engineering
----
 name: C8 Orchestration Cluster E2E Tests On Demand
 
 on:
   workflow_dispatch:
-    inputs:
-      branch:
-        description: "Enter the branch to test"
-        required: true
-        default: "main"
-
 permissions:
   contents: read
 
@@ -266,10 +256,10 @@ jobs:
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
 
   c8-orchestration-cluster-api-tests-rdbms:
-    if: ${{ needs.validate-branch.outputs.base == 'stable/8.9' || needs.validate-branch.outputs.base == 'main' }}
+    if: always()
     name: C8 Orchestration Cluster API Tests (H2/RDBMS)
     needs: validate-branch
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     permissions: {}
     steps:
@@ -407,13 +397,13 @@ jobs:
         working-directory: qa/c8-orchestration-cluster-e2e-test-suite
 
       - name: Print Camunda logs on failure
-        if: failure()
+        if: always()
         run: |
           echo "=== Camunda logs ==="
           cat dev-dist/camunda.log
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: failure()
+        if: always()
         with:
           name: C8 Orchestration Cluster API Test Result (H2-RDBMS)
           path: qa/c8-orchestration-cluster-e2e-test-suite/html-report
@@ -436,12 +426,20 @@ jobs:
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
 
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+      fail-fast: false
   c8-orchestration-cluster-e2e-tests:
     name: C8 Orchestration Cluster E2E Tests (Tasklist ${{ matrix.tasklist_mode }} mode)
     strategy:
       fail-fast: false
       matrix:
-        tasklist_mode: ${{ fromJSON( (needs.validate-branch.outputs.base == 'stable/8.6' || needs.validate-branch.outputs.base == 'stable/8.7') && '["v1"]' || needs.validate-branch.outputs.base == 'main' && '["v2"]' || '["v1","v2"]' ) }}
+        tasklist_mode: ${{ fromJSON( (needs.validate-branch.outputs.base == 'stable/8.6' || 
+          needs.validate-branch.outputs.base == 'stable/8.7') && '["v1"]' || needs.validate-branch.outputs.base == 
+          'main' && '["v2"]' || '["v1","v2"]' ) }}
     needs: [validate-branch]
     runs-on: ubuntu-latest
     steps:

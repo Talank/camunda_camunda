@@ -1,19 +1,7 @@
-# description: Runs End to End tests on the C8 Orchestration Cluster API on the code in a branch. This workflow is run manually.
-# You select a repo branch, and the workflow builds the server on that branch, then runs the e2e tests from the branch against the server
-# It tests the server with RDBMS and ES in parallel. This helps to identify differential API behaviour based on storage engine.
-# type: CI
-# owner: @camunda/qa-engineering
----
 name: C8 Orchestration Cluster API E2E Tests On Demand for the code in a branch
 
 on:
   workflow_dispatch:
-    inputs:
-      branch:
-        description: "Enter the branch to test"
-        required: true
-        default: "main"
-
 permissions:
   contents: read
 
@@ -70,11 +58,12 @@ jobs:
   c8-orchestration-cluster-api-tests-es:
     name: C8 Orchestration Cluster API Tests (ES)
     needs: [validate-branch, utils-get-snapshot-docker-tag]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
       # Prefer SNAPSHOT on main, otherwise use the branch-specific X.Y-SNAPSHOT tag.
-      RESOLVED_DOCKER_TAG: ${{ needs.utils-get-snapshot-docker-tag.outputs.snapshot_tag || needs.utils-get-snapshot-docker-tag.outputs.version_tag }}
+      RESOLVED_DOCKER_TAG: ${{ needs.utils-get-snapshot-docker-tag.outputs.snapshot_tag || 
+        needs.utils-get-snapshot-docker-tag.outputs.version_tag }}
     steps:
       - name: Print input and base branch
         run: |
@@ -211,7 +200,7 @@ jobs:
         working-directory: qa/c8-orchestration-cluster-e2e-test-suite/config
 
       - name: Print Docker logs before failing
-        if: failure()
+        if: always()
         run: |
           if [[ "$NON_STANDALONE" == "true" ]]; then
             docker compose logs tasklist
@@ -298,7 +287,7 @@ jobs:
             -f "$JUNIT_RESULTS_FILE"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: failure()
+        if: always()
         with:
           name: C8 Orchestration Cluster API Test Result
           path: qa/c8-orchestration-cluster-e2e-test-suite/html-report
@@ -314,10 +303,16 @@ jobs:
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
 
+    strategy:
+      matrix:
+        os: &id001
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+      fail-fast: false
   c8-orchestration-cluster-api-tests-rdbms:
     name: C8 Orchestration Cluster API Tests (H2/RDBMS)
     needs: validate-branch
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     permissions: {}
     steps:
@@ -454,13 +449,13 @@ jobs:
         working-directory: qa/c8-orchestration-cluster-e2e-test-suite
 
       - name: Print Camunda logs on failure
-        if: failure()
+        if: always()
         run: |
           echo "=== Camunda logs ==="
           cat dev-dist/camunda.log
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: failure()
+        if: always()
         with:
           name: C8 Orchestration Cluster API Test Result (H2-RDBMS)
           path: qa/c8-orchestration-cluster-e2e-test-suite/html-report
@@ -482,3 +477,7 @@ jobs:
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           secret_vault_secretId: ${{ secrets.VAULT_SECRET_ID }}
+    strategy:
+      matrix:
+        os: *id001
+      fail-fast: false

@@ -5,8 +5,6 @@
 name: Optimize E2E Self-Managed (Nightly)
 
 on:
-  schedule:
-    - cron: "0 2 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -30,7 +28,7 @@ jobs:
     permissions:
       contents: read
       id-token: write # for authenticating with GCP
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     env:
       TEST_TYPE: E2E
@@ -141,3 +139,9 @@ jobs:
           secret_vault_address: ${{ secrets.VAULT_ADDR }}
           secret_vault_roleId: ${{ secrets.VAULT_ROLE_ID }}
           user_description: "team-core-features"
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+      fail-fast: false

@@ -18,21 +18,20 @@
 name: Optimize CI Reusable
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
       branch:
-        description: "The branch name to be used for the workflow"
-        required: true
         type: string
+        description: "The branch name to be used for the workflow"
+        default: master
       pushDocker:
-        description: "Whether the built docker images are pushed to camunda registry"
         type: boolean
+        description: "Whether the built docker images are pushed to camunda registry"
         default: false
       version:
-        description: "Custom Docker image tag (defaults to pr-<commit-hash>)"
-        required: false
         type: string
-
+        description: "Custom Docker image tag (defaults to pr-<commit-hash>)"
+        default: ''
 defaults:
   run:
     # use bash shell by default to ensure pipefail behavior is the default
@@ -42,7 +41,7 @@ defaults:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
       # Setup: checkout branch
@@ -128,3 +127,9 @@ jobs:
             REVISION=${{ env.GIT_COMMIT_HASH }}
           tags: ${{ env.IMAGE_TAG }}
           push: ${{ inputs.pushDocker }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+      fail-fast: false
